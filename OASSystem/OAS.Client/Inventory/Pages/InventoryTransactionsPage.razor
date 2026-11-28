@@ -21,13 +21,13 @@
     <div class="inv-toolbar">
         <div class="inv-actions">
             <UiButton Text="إضافة جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Disabled="@(Busy || Creating)" OnClick="BeginCreateAsync" />
-            <UiButton Text="حفظ" AdditionalCssClass="inv-save" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Disabled="@(!Creating || Busy)" Loading="@_saving" OnClick="SaveAsync" />
+            <UiButton Text="حفظ" AdditionalCssClass="inv-save" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Disabled="@(!Creating || Busy || !_availableStockLoaded || VariantOptions.Count == 0)" Loading="@_saving" OnClick="SaveAsync" />
             @if (Creating)
             {
                 <UiButton Text="إلغاء" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@Busy" OnClick="CancelCreateAsync" />
             }
             <UiButton Text="ترحيل" IconCssClass="fa-solid fa-check-double" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(!CanPost || Busy)" Loading="@_posting" OnClick="PostAsync" />
-            <UiButton Text="تحديث" AdditionalCssClass="inv-refresh" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Busy || Creating)" Loading="@_loading" OnClick="RefreshAsync" />
+            <UiButton Text="تحديث" AdditionalCssClass="inv-refresh" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@Busy" Loading="@(_loading || _loadingAvailableStock)" OnClick="RefreshAsync" />
             <UiButton Text="استلام مشتريات" AdditionalCssClass="inv-receipt" IconCssClass="fa-solid fa-truck-ramp-box" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Busy || Creating)" OnClick="OpenPurchaseReceiptsAsync" />
             <details class="inv-excel">
                 <summary>ملفات Excel <i class="fa-solid fa-angle-down" aria-hidden="true"></i></summary>
@@ -46,18 +46,44 @@
     {
         <UiAlert Message="جاري تحميل عمليات المخزون..." />
     }
+    @if (_postingErrors.Count > 0)
+    {
+        <UiAlert Tone="AlertTone.Danger">
+            <strong>تعذر ترحيل العملية. لم يتم صرف أي كمية.</strong>
+            <ul class="txn-posting-errors">
+                @foreach (var error in _postingErrors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+            <span>راجع أرصدة المخزون المحدد، ثم أعد المحاولة بعد توفر الكمية المطلوبة.</span>
+        </UiAlert>
+    }
     @if (Creating && !_warehouses.Any(x => x.IsActive))
     {
         <UiAlert Tone="AlertTone.Danger" Message="لا يوجد مخزن نشط يمكن استخدامه في عملية مخزون جديدة." />
+    }
+    @if (Creating && _availableStockError is not null)
+    {
+        <UiAlert Tone="AlertTone.Danger" Message="@_availableStockError" />
+        <UiButton Text="إعادة تحميل المتاح" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@Busy" OnClick="@(_ => LoadAvailableStockAsync())" />
+    }
+    @if (Creating && _availableStockLoaded && VariantOptions.Count == 0)
+    {
+        <UiAlert Tone="AlertTone.Warning" Message="لا توجد أصناف متاحة في مخزن المصدر. اختر مخزنًا آخر أو رحّل استلام مشتريات أولاً." />
     }
     @if (Creating && !_variants.Any(IsUsableVariant))
     {
         <UiAlert Tone="AlertTone.Danger" Message="لا توجد أصناف نشطة ومخزنية." />
     }
     @if (_selectedTransaction is { Status: InventoryTransactionStatus.Draft } oldDraft &&
-         oldDraft.TransactionType is (InventoryTransactionType.Receipt or InventoryTransactionType.Opening or InventoryTransactionType.AdjustmentIncrease or InventoryTransactionType.SalesReturn))
+         oldDraft.TransactionType is (InventoryTransactionType.Receipt or InventoryTransactionType.AdjustmentIncrease or InventoryTransactionType.SalesReturn))
     {
         <UiAlert Tone="AlertTone.Warning" Message="هذه مسودة وارد يدوي قديمة ولا يمكن ترحيلها. أنشئ سند استلام مشتريات بدلاً منها." />
+    }
+    @if (_selectedTransaction is { TransactionType: InventoryTransactionType.Opening } opening)
+    {
+        <UiButton Text="فتح الرصيد الافتتاحي" Variant="ButtonVariant.Secondary" OnClick="@(_ => OpenOpeningAsync(opening.Id))" />
     }
     <details class="inv-editor inv-editor-panel txn-panel" @key="DataPanelKey" open>
         <summary><span><i class="fa-solid fa-file-lines" aria-hidden="true"></i> بيانات العملية</span><i class="fa-solid fa-angle-down inv-editor-chevron" aria-hidden="true"></i></summary>
@@ -137,7 +163,7 @@
             else if (_selectedTransaction is { } transaction)
             {
                 <div class="txn-read-field"><span>رقم العملية</span><div>@transaction.TransactionNumber</div></div>
-                <div class="txn-read-field"><span>نوع العملية</span><div>@InventoryArabicPresenter.TransactionTypeText(transaction.TransactionType)</div></div>
+                <div class="txn-read-field"><span>نوع العملية</span><div>@(transaction.ReferenceType == "InventoryOpeningReversal" ? "عكس رصيد افتتاحي" : InventoryArabicPresenter.TransactionTypeText(transaction.TransactionType))</div></div>
                 <div class="txn-read-field"><span>تاريخ العملية</span><div>@InventoryDisplayFormat.Date(transaction.TransactionDate.ToLocalTime())</div></div>
                 <div class="txn-read-field"><span>من مخزن</span><div>@WarehouseName(transaction.SourceWarehouseId)</div></div>
                 <div class="txn-read-field"><span>إلى مخزن</span><div>@WarehouseName(transaction.DestinationWarehouseId)</div></div>
@@ -183,7 +209,7 @@
                                                   ValueChanged="@(v => OnLineVariantChanged(line, v))"
                                                   Options="@VariantOptions"
                                                   ErrorText="@line.ProductVariantError"
-                                                  Disabled="@Busy" Required="true"
+                                                  Disabled="@(Busy || !_availableStockLoaded || VariantOptions.Count == 0)" Required="true"
                                                   Size="ControlSize.Small" />
                                     </td>
                                     <td>@UnitName(ParseGuid(line.ProductVariantId))</td>
@@ -260,7 +286,7 @@
                      OnRowClick="@(x => SelectFromHistoryAsync(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
             <RowTemplate Context="transaction">
                 <td>@transaction.TransactionNumber</td>
-                <td>@InventoryArabicPresenter.TransactionTypeText(transaction.TransactionType)</td>
+                <td>@(transaction.ReferenceType == "InventoryOpeningReversal" ? "عكس رصيد افتتاحي" : InventoryArabicPresenter.TransactionTypeText(transaction.TransactionType))</td>
                 <td>@InventoryDisplayFormat.Date(transaction.TransactionDate.ToLocalTime())</td>
                 <td>@WarehouseName(transaction.SourceWarehouseId)</td>
                 <td>@WarehouseName(transaction.DestinationWarehouseId)</td>
@@ -278,7 +304,7 @@
     [Parameter] public Guid? RecordId { get; set; }
     private string? _appliedInventoryRoute;
     private bool Creating => _mode == ViewMode.Create;
-    private bool Busy => _loading || _saving || _posting || _exporting || _selecting;
+    private bool Busy => _loading || _saving || _posting || _exporting || _selecting || _loadingAvailableStock;
     private bool _selecting;
     private int _linePage = 1, _historyPage = 1;
     private int _validationPanelRevision;
@@ -339,11 +365,12 @@
             return;
         }
         if (rows.Count > 0) await SelectAsync(rows[0].Id);
-        else { _selectedId = null; _selectedTransaction = null; _selectedLines = []; _selectedLineId = null; _linePage = 1; _mode = ViewMode.Empty; }
+        else { _selectedId = null; _selectedTransaction = null; _selectedLines = []; _selectedLineId = null; _linePage = 1; _postingErrors = []; _mode = ViewMode.Empty; }
     }
     private async Task OnTypeFilterChanged(string? value) { _typeFilter = value; await ApplyFiltersAsync(); }
     private async Task OnStatusFilterChanged(string? value) { _statusFilter = value; await ApplyFiltersAsync(); }
     private async Task OnWarehouseFilterChanged(string? value) { _warehouseFilter = value; await ApplyFiltersAsync(); }
+    private Task OpenOpeningAsync(Guid id) { InventoryNavigation.NavigateTo($"/inventory/openings?documentId={id:D}"); return Task.CompletedTask; }
     private Task OpenPurchaseReceiptsAsync(MouseEventArgs _) { InventoryNavigation.NavigateTo("/purchases/receipts"); return Task.CompletedTask; }
     protected override async Task OnParametersSetAsync()
     {
@@ -392,6 +419,11 @@
     private bool _exporting;
     private bool _saving;
     private bool _posting;
+    private bool _loadingAvailableStock;
+    private bool _availableStockLoaded;
+    private Dictionary<Guid, decimal> _availableStock = new();
+    private string? _availableStockError;
+    private IReadOnlyList<string> _postingErrors = [];
     private string? _search;
     private string? _typeFilter;
     private string? _statusFilter;
@@ -429,8 +461,8 @@
     private IReadOnlyList<UiSelectOption> WarehouseOptions =>
         [new UiSelectOption(string.Empty, "اختر المخزن"), .. _warehouses.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))];
 
-    private IReadOnlyList<UiSelectOption> VariantOptions => _variants.Where(IsUsableVariant)
-        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{ProductName(x.ProductId)} - {x.SKU}{(string.IsNullOrWhiteSpace(x.VariantName) ? string.Empty : $" - {x.VariantName}")}"))
+    private IReadOnlyList<UiSelectOption> VariantOptions => _variants.Where(x => IsUsableVariant(x) && _availableStock.GetValueOrDefault(x.Id) > 0m)
+        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{ProductName(x.ProductId)} - {x.SKU}{(string.IsNullOrWhiteSpace(x.VariantName) ? string.Empty : $" - {x.VariantName}")} — المتاح: {InventoryDisplayFormat.Number(_availableStock[x.Id])}"))
         .ToArray();
 
     private InventoryTransactionType CurrentType => Enum.TryParse<InventoryTransactionType>(_transactionType, out var parsedByName)
@@ -441,6 +473,7 @@
         or InventoryTransactionType.Transfer
         or InventoryTransactionType.AdjustmentDecrease
         or InventoryTransactionType.PurchaseReturn
+        or InventoryTransactionType.ProductionIssue
         or InventoryTransactionType.Scrap;
 
     private bool RequiresDestinationWarehouse => CurrentType is InventoryTransactionType.Opening
@@ -529,16 +562,18 @@
 
     private async Task RefreshAsync(MouseEventArgs args)
     {
-        if (Busy || Creating) return;
+        if (Busy) return;
+        if (Creating) { await LoadAvailableStockAsync(); return; }
         await LoadAsync();
         if (_selectedId is { } id && FilteredTransactions.Any(x => x.Id == id)) await SelectAsync(id);
         else await ApplyFiltersAsync();
     }
     private Task SearchChangedAsync(string? _) => Busy || Creating ? Task.CompletedTask : ApplyFiltersAsync();
 
-    private Task BeginCreateAsync(MouseEventArgs args)
+    private async Task BeginCreateAsync(MouseEventArgs args)
     {
         _mode = ViewMode.Create;
+        _postingErrors = [];
         _selectedId = null;
         _selectedTransaction = null;
         _selectedLines = [];
@@ -553,7 +588,7 @@
         ClearValidationErrors();
         _draftLines.Clear();
         AddLine();
-        return Task.CompletedTask;
+        await LoadAvailableStockAsync();
     }
 
     private async Task CancelCreateAsync(MouseEventArgs args)
@@ -567,7 +602,7 @@
         else await ApplyFiltersAsync();
     }
 
-    private void OnTransactionTypeChanged(string? value)
+    private async Task OnTransactionTypeChanged(string? value)
     {
         _transactionType = value ?? string.Empty;
         _transactionTypeError = null;
@@ -596,6 +631,7 @@
             _destinationWarehouseId = _warehouses.FirstOrDefault(x => x.IsActive && x.Id.ToString("D") != _sourceWarehouseId)?.Id.ToString("D");
         if (!IsAdjustment)
             _reasonError = null;
+        await LoadAvailableStockAsync();
     }
 
     private void OnTransactionDateChanged(DateOnly? value)
@@ -604,12 +640,13 @@
         _transactionDateError = null;
     }
 
-    private void OnSourceWarehouseChanged(string? value)
+    private async Task OnSourceWarehouseChanged(string? value)
     {
         _sourceWarehouseId = value;
         _sourceWarehouseError = null;
         if (_sourceWarehouseId != _destinationWarehouseId)
             _destinationWarehouseError = null;
+        await LoadAvailableStockAsync();
     }
 
     private void OnDestinationWarehouseChanged(string? value)
@@ -618,6 +655,60 @@
         _destinationWarehouseError = null;
         if (_sourceWarehouseId != _destinationWarehouseId)
             _sourceWarehouseError = null;
+    }
+
+    private async Task LoadAvailableStockAsync()
+    {
+        _availableStockLoaded = false;
+        _availableStock.Clear();
+        _availableStockError = null;
+        if (!Guid.TryParse(_sourceWarehouseId, out var sourceId))
+            return;
+
+        _loadingAvailableStock = true;
+        try
+        {
+            var stock = await Inventory.GetInventoryTransactionAvailableStockAsync(sourceId);
+            _availableStock = stock.ToDictionary(x => x.ProductVariantId, x => x.AvailableQuantity);
+            _availableStockLoaded = true;
+            foreach (var line in _draftLines)
+            {
+                if (!Guid.TryParse(line.ProductVariantId, out var id)) continue;
+                if (_availableStock.GetValueOrDefault(id) <= 0m)
+                {
+                    line.ProductVariantId = null;
+                    line.ProductVariantError = "الصنف غير متاح في مخزن المصدر المحدد.";
+                    line.QuantityError = null;
+                }
+                else ValidateAvailableQuantity(line);
+            }
+        }
+        catch (ApiClientException ex)
+        {
+            _availableStockError = "تعذر تحميل الأصناف المتاحة. أعد المحاولة قبل حفظ العملية.";
+            ApiFeedback.Show(ex.Error);
+        }
+        catch (Exception)
+        {
+            _availableStockError = "تعذر تحميل الأصناف المتاحة. أعد المحاولة قبل حفظ العملية.";
+        }
+        finally { _loadingAvailableStock = false; }
+    }
+
+    private bool ValidateAvailableQuantity(TransactionLineForm line)
+    {
+        if (!Guid.TryParse(line.ProductVariantId, out var id) ||
+            !TryParseDecimal(line.Quantity, out var requested) || requested <= 0m)
+            return true; // The existing required/precision validators handle invalid input.
+
+        var available = _availableStock.GetValueOrDefault(id);
+        if (requested > available)
+        {
+            line.QuantityError = $"المتاح: {InventoryDisplayFormat.Number(available)}، المطلوب: {InventoryDisplayFormat.Number(requested)}.";
+            return false;
+        }
+        line.QuantityError = null;
+        return true;
     }
 
     private void OnReasonChanged(string? value)
@@ -651,6 +742,8 @@
     {
         line.ProductVariantId = value;
         line.ProductVariantError = null;
+        line.QuantityError = null;
+        ValidateAvailableQuantity(line);
         if (Guid.TryParse(value, out var variantId) && _variants.FirstOrDefault(x => x.Id == variantId) is { } selected)
         {
             // Purchase price is a suggestion only; the operator can change it before saving.
@@ -673,32 +766,35 @@
         line.Quantity = value ?? string.Empty;
         line.QuantityError = null;
         line.UnitCostError = null;
+        ValidateAvailableQuantity(line);
     }
 
     private void OnLineUnitCostChanged(TransactionLineForm line, string? value)
     {
         line.UnitCost = value ?? string.Empty;
         line.UnitCostError = null;
-        line.QuantityError = null;
+        ValidateAvailableQuantity(line);
     }
 
     private async Task SaveAsync(MouseEventArgs args)
     {
-        if (_mode != ViewMode.Create || Busy)
+        if (_mode != ViewMode.Create || Busy || !_availableStockLoaded)
             return;
-
-        if (!TryBuildCreateRequest(out var request, out var hasRequiredErrors))
-        {
-            _validationPanelRevision++;
-            Snackbar.Error(hasRequiredErrors
-                ? "هناك بيانات إجبارية لم يتم إدخالها."
-                : "توجد قيم غير صحيحة. يرجى مراجعة الحقول المميزة باللون الأحمر.");
-            return;
-        }
 
         _saving = true;
         try
         {
+            // Refresh the source balance immediately before sending the create command.
+            await LoadAvailableStockAsync();
+            if (!_availableStockLoaded) return;
+            if (!TryBuildCreateRequest(out var request, out var hasRequiredErrors))
+            {
+                _validationPanelRevision++;
+                Snackbar.Error(hasRequiredErrors
+                    ? "هناك بيانات إجبارية لم يتم إدخالها."
+                    : "توجد قيم غير صحيحة. يرجى مراجعة الحقول المميزة باللون الأحمر.");
+                return;
+            }
             var saved = await Inventory.CreateInventoryTransactionAsync(request);
             if (saved is null)
                 return;
@@ -712,6 +808,12 @@
             await SelectAsync(saved.Id, allowWhileSaving: true);
             Snackbar.Success("تم إنشاء عملية المخزون.");
             if (Screen == "new") InventoryNavigation.NavigateTo($"/inventory/transactions/details/{saved.Id:D}", replace: true);
+        }
+        catch (ApiClientException ex) when (string.Equals(ex.Error.Code, "insufficient_stock", StringComparison.OrdinalIgnoreCase))
+        {
+            await LoadAvailableStockAsync();
+            _validationPanelRevision++;
+            ApiFeedback.Show(ex.Error);
         }
         catch (ApiClientException ex)
         {
@@ -828,6 +930,11 @@
             else
             {
                 variantId = parsedVariantId;
+                if (_availableStock.GetValueOrDefault(parsedVariantId) <= 0m)
+                {
+                    line.ProductVariantError = "الصنف غير متاح في مخزن المصدر.";
+                    isValid = false;
+                }
             }
 
             decimal quantity = 0;
@@ -889,6 +996,8 @@
                 isValid = false;
             }
 
+            if (variantId.HasValue && line.QuantityError is null && !ValidateAvailableQuantity(line))
+                isValid = false;
             parsedVariants.Add(variantId);
             if (variantId.HasValue && line.QuantityError is null && line.UnitCostError is null)
                 lines.Add(new CreateInventoryTransactionLineRequest(variantId.Value, quantity, unitCost, null));
@@ -945,6 +1054,7 @@
             var transaction = _transactions.FirstOrDefault(x => x.Id == id) ?? await Inventory.GetInventoryTransactionAsync(id);
             if (transaction is null) return;
             var lines = await Inventory.GetInventoryTransactionLinesAsync(id);
+            _postingErrors = [];
             _selectedId = id;
             _selectedTransaction = transaction;
             _selectedLines = lines;
@@ -959,15 +1069,70 @@
         finally { _selecting = false; }
     }
 
+    // Check the current available quantity, not the on-hand quantity or the total
+    // stock across warehouses. This is advisory; the posting command must still
+    // validate the balance atomically because another user may consume it.
+    private async Task<IReadOnlyList<string>> GetPostingStockErrorsAsync(
+        InventoryTransactionDto transaction, IReadOnlyList<InventoryTransactionLineDto> lines)
+    {
+        if (transaction.TransactionType is not (InventoryTransactionType.Issue or
+            InventoryTransactionType.Transfer or InventoryTransactionType.AdjustmentDecrease or
+            InventoryTransactionType.PurchaseReturn or InventoryTransactionType.ProductionIssue or
+            InventoryTransactionType.Scrap))
+            return [];
+
+        // Match the posting handler's source-warehouse selection for outbound movements.
+        var warehouseId = transaction.TransactionType == InventoryTransactionType.Transfer
+            ? transaction.SourceWarehouseId
+            : transaction.SourceWarehouseId ?? transaction.DestinationWarehouseId;
+        if (!warehouseId.HasValue)
+            return ["لم يتم تحديد مخزن المصدر للعملية."];
+
+        var errors = new List<string>();
+        foreach (var group in lines.GroupBy(line => line.ProductVariantId))
+        {
+            var required = group.Sum(line => line.Quantity);
+            var balance = await Inventory.GetInventoryBalanceAsync(warehouseId.Value, group.Key);
+            var available = balance?.AvailableQuantity ?? 0m;
+            if (available >= required)
+                continue;
+
+            errors.Add($"الصنف: {VariantLabel(group.Key)} ({VariantSku(group.Key)}) — " +
+                $"المخزن: {WarehouseName(warehouseId)} — " +
+                $"المتاح: {InventoryDisplayFormat.Number(available)}، " +
+                $"المطلوب: {InventoryDisplayFormat.Number(required)}.");
+        }
+        return errors;
+    }
+
     private async Task PostAsync(MouseEventArgs args)
     {
-        if (!CanPost || !_selectedId.HasValue || Busy)
+        if (!CanPost || !_selectedId.HasValue || Busy || _selectedTransaction is not { } transaction)
             return;
 
         _posting = true;
+        _postingErrors = [];
         try
         {
-            var posted = await Inventory.PostInventoryTransactionAsync(_selectedId.Value, new PostInventoryTransactionRequest());
+            try
+            {
+                // Refresh lines from the API rather than depending on the current table page.
+                var lines = await Inventory.GetInventoryTransactionLinesAsync(transaction.Id);
+                _postingErrors = await GetPostingStockErrorsAsync(transaction, lines);
+            }
+            catch (ApiClientException ex) when (ex.StatusCode == 403)
+            {
+                // Posting and balance-view permissions are independent. Users who
+                // may post but cannot read balances still use the server's guard.
+            }
+
+            if (_postingErrors.Count > 0)
+            {
+                Snackbar.Error("لا يمكن ترحيل العملية. راجع رسالة الرصيد المتاح.");
+                return;
+            }
+
+            var posted = await Inventory.PostInventoryTransactionAsync(transaction.Id, new PostInventoryTransactionRequest());
             if (posted is null)
                 return;
 
@@ -975,6 +1140,23 @@
             await LoadAsync();
             await SelectAsync(posted.Id);
             Snackbar.Success("تم ترحيل عملية المخزون بنجاح.");
+        }
+        catch (ApiClientException ex) when (string.Equals(ex.Error.Code, "insufficient_stock", StringComparison.OrdinalIgnoreCase))
+        {
+            // The stock may change between the advisory check and actual posting.
+            _postingErrors = ["الكمية المتاحة في مخزن المصدر غير كافية لترحيل العملية. ربما تغير الرصيد منذ آخر تحقق."];
+            try
+            {
+                var lines = await Inventory.GetInventoryTransactionLinesAsync(transaction.Id);
+                var currentErrors = await GetPostingStockErrorsAsync(transaction, lines);
+                if (currentErrors.Count > 0)
+                    _postingErrors = currentErrors;
+            }
+            catch (Exception)
+            {
+                // Keep the original stock-conflict feedback even if refreshing balances fails.
+            }
+            Snackbar.Error("تعذر الترحيل بسبب عدم كفاية الرصيد المتاح.");
         }
         catch (ApiClientException ex)
         {

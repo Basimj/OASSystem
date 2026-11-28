@@ -78,6 +78,13 @@ public static class InventoryPermissions
         public const string Post = "inventory.transactions.post";
     }
 
+    public static class Openings
+    {
+        public const string View = "inventory.openings.view";
+        public const string Edit = "inventory.openings.edit";
+        public const string Post = "inventory.openings.post";
+    }
+
     public static class Ledger
     {
         public const string View = "inventory.ledger.view";

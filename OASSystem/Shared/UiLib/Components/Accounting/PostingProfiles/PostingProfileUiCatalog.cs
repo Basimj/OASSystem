@@ -16,6 +16,7 @@ public static class PostingProfileUiCatalog
         new("Sales", "المبيعات"),
         new("Purchasing", "المشتريات"),
         new("Accounting", "المحاسبة"),
+        new("Inventory", "المخزون"),
         new("Optical", "المعمل البصري")
     ];
 
@@ -25,6 +26,7 @@ public static class PostingProfileUiCatalog
         new("Purchasing", "PurchaseReceipt", "استلام مشتريات"),
         new("Purchasing", "PurchaseInvoice", "فاتورة مشتريات"),
         new("Accounting", "CustomerAdvanceApplication", "تطبيق عربون عميل"),
+        new("Inventory", "InventoryOpening", "رصيد افتتاحي للمخزون"),
         new("Optical", "OpticalBreakage", "تلف أو كسر المعمل")
     ];
 
@@ -48,6 +50,11 @@ public static class PostingProfileUiCatalog
                 new("GoodsReceivedNotInvoiced", "بضاعة مستلمة غير مفوترة", true, "حساب تسوية الاستلام"),
                 new("PurchaseTax", "ضريبة المشتريات", false, "عند وجود ضريبة مشتريات"),
                 new("PurchasePriceVariance", "فروق أسعار المشتريات", false, "عند حدوث فروق في أسعار المطابقة")
+            ],
+            ["Inventory/InventoryOpening"] =
+            [
+                new("Inventory", "المخزون", true, "حساب المخزون المحدد في إعدادات المحاسبة"),
+                new("OpeningOffset", "مقابل الأرصدة الافتتاحية", true, "حساب مستقل ضمن حقوق الملكية")
             ],
             ["Accounting/CustomerAdvanceApplication"] =
             [

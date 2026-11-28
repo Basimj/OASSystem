@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Entities.Inventory;
 
@@ -35,12 +35,16 @@ public class InventoryTransactionLine : Entity<Guid>
 
         Notes = notes;
     }
-
+    // Persist the actual unit cost applied by the inventory posting service.
     public void ApplyPostedUnitCost(decimal unitCost)
     {
         if (unitCost < 0m)
-            throw new ArgumentOutOfRangeException(nameof(unitCost));
+            throw new System.ArgumentOutOfRangeException(nameof(unitCost), "Unit cost cannot be negative.");
+
         UnitCost = unitCost;
-        TotalCost = Quantity * unitCost;
+        TotalCost = Math.Round(Quantity * UnitCost, 2);
     }
+
+    // Match the inventory valuation rounding for opening and opening-reversal lines.
+    public void RoundOpeningValue() => TotalCost = Math.Round(Quantity * UnitCost, 2);
 }

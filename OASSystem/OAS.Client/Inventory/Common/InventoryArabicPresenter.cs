@@ -19,7 +19,7 @@ public static class InventoryArabicPresenter
     // History filters still display old inward movements and receipt-generated transactions.
     public static readonly IReadOnlyList<UiSelectOption> TransactionTypeHistoryOptions =
     [
-        new(((int)InventoryTransactionType.Opening).ToString(), "رصيد افتتاحي (سابق)"),
+        new(((int)InventoryTransactionType.Opening).ToString(), "رصيد افتتاحي"),
         new(((int)InventoryTransactionType.Receipt).ToString(), "استلام مشتريات / إدخال مخزون"),
         new(((int)InventoryTransactionType.AdjustmentIncrease).ToString(), "تعديل زيادة (سابق)"),
         new(((int)InventoryTransactionType.SalesReturn).ToString(), "مرتجع بيع"),

@@ -5,9 +5,9 @@ public sealed record WarehouseReportStock(Guid WarehouseId, Guid VariantId, deci
     decimal? Reserved, decimal? OnOrder, decimal? AverageCost, decimal? Value, DateTimeOffset? LastMovement);
 public sealed record WarehouseFlow(decimal? Opening, decimal Purchases, decimal OtherIn, decimal TransferIn,
     decimal SalesReturns, decimal Sales, decimal PurchaseReturns, decimal TransferOut, decimal OtherOut,
-    decimal? Closing)
+    decimal? Closing, decimal OpeningIn = 0m)
 {
-    public decimal In => Purchases + OtherIn + TransferIn + SalesReturns;
+    public decimal In => Purchases + OtherIn + TransferIn + SalesReturns + OpeningIn;
     public decimal Out => Sales + PurchaseReturns + TransferOut + OtherOut;
 }
 public sealed record WarehouseReportMovement(Guid WarehouseId, Guid VariantId, WarehouseFlow Quantity, WarehouseFlow Cost);

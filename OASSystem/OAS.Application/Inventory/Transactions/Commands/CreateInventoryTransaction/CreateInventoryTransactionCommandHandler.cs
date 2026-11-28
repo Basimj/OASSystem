@@ -25,6 +25,10 @@ public sealed class CreateInventoryTransactionCommandHandler(
     {
         var request = command.Request;
 
+        if (string.Equals(request.ReferenceType?.Trim(), "InventoryOpening", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(request.ReferenceType?.Trim(), "InventoryOpeningReversal", StringComparison.OrdinalIgnoreCase))
+            throw new ConflictException("opening_reference_reserved", "استخدم واجهة الرصيد الافتتاحي لإنشاء المستندات الافتتاحية وعكسها.");
+
         // Never trust the client-side transaction type list: enforce this at the API handler.
         if (!ManualInventoryTransactionPolicy.IsAllowed((DomainType)(int)request.TransactionType))
             throw new ConflictException(ManualInventoryTransactionPolicy.ErrorCode, ManualInventoryTransactionPolicy.ErrorMessage);
@@ -45,31 +49,36 @@ public sealed class CreateInventoryTransactionCommandHandler(
             EnsureActiveWarehouse(destination);
         }
 
-        if (request.SourceWarehouseId is not { } sourceId || sourceId == Guid.Empty)
-            throw new ConflictException("source_warehouse_required", "يجب تحديد المخزن المصدر.");
+        // All currently permitted manual transactions consume stock from the source.
+        if (request.SourceWarehouseId is not Guid sourceId || sourceId == Guid.Empty)
+            throw Validation("source_warehouse_required", "يجب تحديد مخزن المصدر.");
 
-        // Validate every line before allocating a number or adding any entities.
-        // A draft is not a reservation; stock must be checked again at posting.
-        var validatedLines = new List<(OAS.Contracts.Inventory.Transactions.CreateInventoryTransactionLineRequest Request, decimal UnitCost)>();
         foreach (var lineReq in request.Lines)
         {
-            var variant = await variantRepository.GetByIdAsync(lineReq.ProductVariantId, cancellationToken)
-                ?? throw new NotFoundException(nameof(ProductVariant), lineReq.ProductVariantId);
+            var variant = await variantRepository.GetByIdAsync(lineReq.ProductVariantId, cancellationToken);
+            if (variant is null)
+                throw new NotFoundException(nameof(ProductVariant), lineReq.ProductVariantId);
             EnsureVariantActive(variant);
-            var product = await productRepository.GetByIdAsync(variant.ProductId, cancellationToken)
-                ?? throw new NotFoundException(nameof(Product), variant.ProductId);
+
+            var product = await productRepository.GetByIdAsync(variant.ProductId, cancellationToken);
+            if (product is null)
+                throw new NotFoundException(nameof(Product), variant.ProductId);
             EnsureProductEligible(product);
+        }
 
-            var balance = await balanceRepository.GetByWarehouseAndVariantAsync(sourceId, variant.Id, cancellationToken);
+        // Validate every SKU before allocating a number or adding any draft entities.
+        // A draft does not reserve stock; posting must still recheck the live balance.
+        foreach (var group in request.Lines.GroupBy(x => x.ProductVariantId))
+        {
+            var required = group.Sum(x => x.Quantity);
+            var balance = await balanceRepository.GetByWarehouseAndVariantAsync(sourceId, group.Key, cancellationToken);
             var available = balance?.AvailableQuantity ?? 0m;
-            if (balance is null || available < lineReq.Quantity || balance.OnHandQuantity < lineReq.Quantity)
+            if (required > available)
+            {
+                var variant = await variantRepository.GetByIdAsync(group.Key, cancellationToken);
                 throw new ConflictException("insufficient_stock",
-                    $"الصنف {variant.SKU}: الكمية المتاحة في المخزن المصدر {available:0.###}، والمطلوبة {lineReq.Quantity:0.###}.");
-
-            var unitCost = balance.AverageUnitCost;
-            if (unitCost > 0m && lineReq.Quantity > 9999999999999999.99m / unitCost)
-                throw new ConflictException("line_total_cost_precision_invalid", "إجمالي تكلفة البند أكبر من الحد المسموح به.");
-            validatedLines.Add((lineReq, unitCost));
+                    $"لا يمكن إنشاء العملية. الصنف {variant?.SKU ?? group.Key.ToString()} — المتاح في مخزن المصدر: {available:0.###}، المطلوب: {required:0.###}.");
+            }
         }
 
         var transactionNumber = request.TransactionNumber;
@@ -91,10 +100,16 @@ public sealed class CreateInventoryTransactionCommandHandler(
             request.Notes);
 
         await transactionRepository.AddAsync(transaction, cancellationToken);
-        foreach (var (lineReq, unitCost) in validatedLines)
+
+        foreach (var lineReq in request.Lines)
         {
             var line = new InventoryTransactionLine(
-                transaction.Id, lineReq.ProductVariantId, lineReq.Quantity, unitCost, lineReq.Notes);
+                transaction.Id,
+                lineReq.ProductVariantId,
+                lineReq.Quantity,
+                lineReq.UnitCost,
+                lineReq.Notes);
+
             await lineRepository.AddAsync(line, cancellationToken);
         }
 

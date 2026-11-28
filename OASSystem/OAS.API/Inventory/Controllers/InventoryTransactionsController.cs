@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using OAS.Application.Inventory.Transactions.Commands.CreateInventoryTransaction;
 using OAS.Application.Inventory.Transactions.Commands.PostInventoryTransaction;
+using OAS.Application.Inventory.Transactions.Queries.GetInventoryTransactionAvailableStock;
 using OAS.Application.Inventory.Transactions.Queries.GetInventoryTransactionById;
 using OAS.Application.Inventory.Transactions.Queries.GetInventoryTransactionLines;
 using OAS.Application.Inventory.Transactions.Queries.GetInventoryTransactions;
@@ -43,6 +44,13 @@ public sealed class InventoryTransactionsController(ISender sender) : Controller
             cancellationToken);
 
         return Ok(result);
+    }
+
+    [HttpGet("available-stock")]
+    public async Task<ActionResult<IReadOnlyList<InventoryTransactionAvailableStockDto>>> GetAvailableStock(
+        [FromQuery] Guid warehouseId, CancellationToken cancellationToken)
+    {
+        return Ok(await sender.Send(new GetInventoryTransactionAvailableStockQuery(warehouseId), cancellationToken));
     }
 
     [HttpGet("{id:guid}")]

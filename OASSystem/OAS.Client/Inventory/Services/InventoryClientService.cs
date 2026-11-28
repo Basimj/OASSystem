@@ -172,6 +172,11 @@ public sealed class InventoryClientService(OasApiClient apiClient) : IInventoryC
             cancellationToken);
 
     // Inventory transactions
+    public async Task<IReadOnlyList<InventoryTransactionAvailableStockDto>> GetInventoryTransactionAvailableStockAsync(
+        Guid warehouseId, CancellationToken cancellationToken = default) =>
+        await apiClient.GetAsync<InventoryTransactionAvailableStockDto[]>(
+            $"{BaseEndpoint}/transactions/available-stock?warehouseId={warehouseId:D}", cancellationToken) ?? [];
+
     public async Task<PagedResult<InventoryTransactionDto>> GetInventoryTransactionsAsync(
         PageRequest request,
         InventoryTransactionType? transactionType = null,

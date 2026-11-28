@@ -41,3 +41,7 @@
 .txn-line-details .txn-lines-scroll { max-height: 42vh; overflow: auto; }
 .txn-line-details .txn-section-head { background: transparent; justify-content: flex-start; }
 @container (max-width: 560px) { .txn-totals { grid-template-columns: minmax(0,1fr); } }
+
+/* Business validation feedback stays inside the transaction workspace. */
+.txn-posting-errors { margin: 4px 0; padding-inline-start: 22px; }
+.txn-posting-errors > li { margin-block: 3px; overflow-wrap: anywhere; }

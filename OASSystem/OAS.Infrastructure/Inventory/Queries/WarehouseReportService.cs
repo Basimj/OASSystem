@@ -109,10 +109,11 @@ public sealed class WarehouseReportService(OasDbContext db) : IWarehouseReportSe
     }
     private sealed class Flow
     {
-        decimal purchases,otherIn,transferIn,salesReturns,sales,purchaseReturns,transferOut,otherOut;
+        decimal openingIn,purchases,otherIn,transferIn,salesReturns,sales,purchaseReturns,transferOut,otherOut;
         public void Add(InventoryTransactionType kind,bool purchase,decimal inbound,decimal outbound)
         {
-            if(kind==InventoryTransactionType.Receipt && purchase) purchases+=inbound;
+            if(kind==InventoryTransactionType.Opening) openingIn+=inbound;
+            else if(kind==InventoryTransactionType.Receipt && purchase) purchases+=inbound;
             else if(kind==InventoryTransactionType.Transfer) transferIn+=inbound;
             else if(kind==InventoryTransactionType.SalesReturn) salesReturns+=inbound;
             else otherIn+=inbound;
@@ -121,6 +122,6 @@ public sealed class WarehouseReportService(OasDbContext db) : IWarehouseReportSe
             else if(kind==InventoryTransactionType.PurchaseReturn) purchaseReturns+=outbound;
             else otherOut+=outbound;
         }
-        public WarehouseFlow Output(decimal? opening,decimal? closing)=>new(opening,purchases,otherIn,transferIn,salesReturns,sales,purchaseReturns,transferOut,otherOut,closing);
+        public WarehouseFlow Output(decimal? opening,decimal? closing)=>new(opening,purchases,otherIn,transferIn,salesReturns,sales,purchaseReturns,transferOut,otherOut,closing,openingIn);
     }
 }

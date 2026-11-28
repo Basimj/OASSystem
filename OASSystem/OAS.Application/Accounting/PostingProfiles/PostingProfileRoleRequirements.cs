@@ -12,6 +12,7 @@ internal static class PostingProfileRoleRequirements
             ("purchasing", "purchasereceipt") => ["Inventory", "GoodsReceivedNotInvoiced"],
             ("purchasing", "purchaseinvoice") => ["GoodsReceivedNotInvoiced"],
             ("accounting", "customeradvanceapplication") => ["CustomerAdvances"],
+            ("inventory", "inventoryopening") => ["Inventory", "OpeningOffset"],
             ("optical", "opticalbreakage") => ["ProductionDamageExpense", "Inventory"],
             _ => []
         };

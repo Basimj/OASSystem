@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Common.Entities;
 using OAS.Domain.Enums.Inventory;
 
 namespace OAS.Domain.Entities.Inventory;
@@ -56,6 +56,22 @@ public class InventoryTransaction : AuditableEntity<Guid>
         ReferenceId = referenceId;
 
         Reason = reason;
+        Notes = notes;
+    }
+
+    public void LinkOpeningJournal(Guid journalId)
+    {
+        if (TransactionType != InventoryTransactionType.Opening || Status != InventoryTransactionStatus.Draft || journalId == Guid.Empty || ReferenceId.HasValue)
+            throw new InvalidOperationException("Cannot link the opening journal.");
+        ReferenceId = journalId;
+    }
+
+    public void UpdateOpeningDraft(DateTimeOffset date, Guid warehouseId, string? notes)
+    {
+        if (TransactionType != InventoryTransactionType.Opening || Status != InventoryTransactionStatus.Draft)
+            throw new InvalidOperationException("Only an opening draft can be updated.");
+        TransactionDate = date;
+        DestinationWarehouseId = warehouseId;
         Notes = notes;
     }
 

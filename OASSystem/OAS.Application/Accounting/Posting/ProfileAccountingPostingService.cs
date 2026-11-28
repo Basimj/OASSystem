@@ -177,6 +177,14 @@ public sealed class ProfileAccountingPostingService(
             if (problem is not null)
                 throw new ConflictException(problem.Value.Code, problem.Value.Message);
         }
+        if (string.Equals(module, "Inventory", StringComparison.OrdinalIgnoreCase) && documentType == "InventoryOpening")
+        {
+            var config = await settings.GetByIdAsync(AccountingSettings.SingletonId, ct);
+            if (account.AccountType == AccountType.Subledger ||
+                (role == "Inventory" && (account.AccountClass != AccountClass.Asset || account.Id != config?.InventoryAccountId)) ||
+                (role == "OpeningOffset" && account.AccountClass != AccountClass.Equity))
+                throw new ConflictException("opening_accounts_invalid", "حسابات ترحيل الرصيد الافتتاحي غير صالحة.");
+        }
         return account.Id;
     }
 

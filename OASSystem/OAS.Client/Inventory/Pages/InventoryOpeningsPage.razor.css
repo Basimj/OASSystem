@@ -1,0 +1,13 @@
+/* Layout only; the inventory catalog owns the shared design and colors. */
+.opening-workspace { scrollbar-gutter: stable; }
+.opening-notes { grid-column: span 3; }
+.opening-lines-scroll { overflow: auto; max-height: 46vh; min-width: 0; }
+.opening-lines-table { min-width: 740px; width: 100%; }
+.opening-workspace ::deep .ui-data-table :is(th,td) { text-align: center !important; vertical-align: middle; }
+.opening-lines-table ::deep :is(.ui-searchable-select__label,.ui-input-text > .ui-text-label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+.opening-totals { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 8px; }
+.opening-totals > span { flex: 1 1 140px; display: flex; justify-content: space-between; background: var(--inv-input); border: 1px solid var(--inv-border); border-radius: var(--inv-radius); padding: 6px; }
+.opening-history { flex: 1 1 180px; min-height: 180px; }
+.opening-import { display: grid; gap: 4px; padding: 6px; }
+.opening-import ::deep input { max-width: 210px; }
+@media (max-width: 800px) { .opening-notes { grid-column: 1 / -1; } }

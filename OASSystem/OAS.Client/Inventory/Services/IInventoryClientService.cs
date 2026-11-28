@@ -81,6 +81,7 @@ public interface IInventoryClientService
     Task<InventoryBalanceDto?> GetInventoryBalanceAsync(Guid warehouseId, Guid productVariantId, CancellationToken cancellationToken = default);
 
     // Inventory transactions
+    Task<IReadOnlyList<InventoryTransactionAvailableStockDto>> GetInventoryTransactionAvailableStockAsync(Guid warehouseId, CancellationToken cancellationToken = default);
     Task<PagedResult<InventoryTransactionDto>> GetInventoryTransactionsAsync(
         PageRequest request,
         InventoryTransactionType? transactionType = null,
