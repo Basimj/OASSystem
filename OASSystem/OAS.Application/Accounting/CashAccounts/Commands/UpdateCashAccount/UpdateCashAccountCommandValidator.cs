@@ -11,6 +11,8 @@ public sealed class UpdateCashAccountCommandValidator
             .NotEmpty()
             .WithErrorCode("cash_account_id_required");
 
+        RuleFor(x => x.Data.MovementType).Must(x => !x.HasValue || Enum.IsDefined(x.Value)).WithMessage("نوع حركة الصندوق غير صالح.");
+
         RuleFor(x => x.Data.Name)
             .NotEmpty()
             .WithErrorCode("cash_account_name_required")

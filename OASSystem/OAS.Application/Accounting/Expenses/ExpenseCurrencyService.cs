@@ -20,6 +20,7 @@ public sealed class ExpenseCurrencyService(
         {
             var cash = await cashAccounts.GetByIdAsync(cashId, ct) ?? throw new NotFoundException(nameof(CashAccount), cashId);
             if (!cash.IsActive) throw new ConflictException("cash_account_inactive", "الصندوق غير نشط.");
+            OAS.Application.Accounting.CashAccounts.CashAccountMovementPolicy.EnsureAllowed(cash, false);
             selectedCurrency = cash.CurrencyId;
         }
         else if (expense.PaymentMethod != PaymentMethod.Cash && expense.BankAccountId is Guid bankId && expense.CashAccountId is null)

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using OAS.Application.Common.Exceptions;
+using OAS.Application.Accounting.CashAccounts;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Infrastructure.Accounting.Persistence.Queries;
@@ -86,6 +87,15 @@ internal static class CashShiftPostingLinker
                 throw new ConflictException("cash_shift_shared_ledger", "الحساب المحاسبي مشترك بين أكثر من صندوق أو بنك.");
             if (!boxes[0].IsActive)
                 throw new ConflictException("cash_account_inactive", "لا يمكن الترحيل إلى صندوق غير نشط.");
+            var journal = posting.Entity;
+            // Internal transfers, verified reversals and shift settlements are not operating receipts/payments.
+            // Manual journals still pass the direction check (linked accounts also disallow manual posting).
+            if (journal.JournalType is not (JournalType.Opening or JournalType.Closing or JournalType.Reversal) &&
+                journal.SourceDocumentType is not ("CashTransfer" or "CashShiftSettlement"))
+            {
+                if (line.DebitAmount > 0) CashAccountMovementPolicy.EnsureAllowed(boxes[0], true);
+                if (line.CreditAmount > 0) CashAccountMovementPolicy.EnsureAllowed(boxes[0], false);
+            }
             var shifts = active.Where(x => boxes.Any(b => b.Id == x.CashAccountId)).ToArray();
             if (shifts.Length == 0)
             {
@@ -147,10 +157,18 @@ internal static class CashShiftPostingLinker
         foreach (var entry in cash)
         {
             var box = entry.Entity;
-            if ((entry.State == EntityState.Deleted || !box.IsActive ||
-                 (entry.State == EntityState.Modified && (entry.Property(x => x.AccountId).IsModified || entry.Property(x => x.CurrencyId).IsModified))) &&
-                await db.Set<CashShift>().AnyAsync(x => x.CashAccountId == box.Id && activeStatuses.Contains(x.Status), ct))
-                throw new ConflictException("cash_account_active_shift", "أغلق الوردية النشطة قبل تعطيل الصندوق أو تغيير حسابه أو عملته.");
+            if (!await db.Set<CashShift>().AnyAsync(x => x.CashAccountId == box.Id && activeStatuses.Contains(x.Status), ct))
+                continue;
+
+            // DbSet.Update marks all properties modified, including unchanged keys.
+            // Compare persisted values under the posting lock, also covering detached updates.
+            var stored = entry.State == EntityState.Modified
+                ? await db.Set<CashAccount>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == box.Id, ct)
+                : null;
+            if (entry.State == EntityState.Deleted || !box.IsActive ||
+                (entry.State == EntityState.Modified && (stored is null || stored.AccountId != box.AccountId ||
+                    stored.CurrencyId != box.CurrencyId || stored.MovementType != box.MovementType)))
+                throw new ConflictException("cash_account_active_shift", "أغلق الوردية النشطة قبل تعطيل الصندوق أو تغيير حسابه أو عملته أو نوع حركته.");
         }
         var cashIds = cash.Select(x => x.Entity.Id).ToArray();
         var bankIds = banks.Select(x => x.Entity.Id).ToArray();

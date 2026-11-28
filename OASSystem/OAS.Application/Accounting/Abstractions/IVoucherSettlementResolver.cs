@@ -44,4 +44,24 @@ public interface IVoucherSettlementResolver
         ExchangeRateType exchangeRateType,
         string? referenceNumber,
         CancellationToken cancellationToken = default);
+
+    Task<VoucherSettlementResolution> ResolveAsync(
+        DateOnly voucherDate,
+        SettlementPartyType partyType,
+        Guid? customerId,
+        Guid? supplierId,
+        Guid? employeeId,
+        string? partyName,
+        Guid? otherCounterpartyAccountId,
+        PaymentMethod paymentMethod,
+        Guid? cashAccountId,
+        Guid? bankAccountId,
+        Guid? otherSettlementAccountId,
+        Guid currencyId,
+        decimal amount,
+        decimal? manualExchangeRate,
+        ExchangeRateType exchangeRateType,
+        string? referenceNumber,
+        CancellationToken cancellationToken, bool isReceipt) =>
+        ResolveAsync(voucherDate, partyType, customerId, supplierId, employeeId, partyName, otherCounterpartyAccountId, paymentMethod, cashAccountId, bankAccountId, otherSettlementAccountId, currencyId, amount, manualExchangeRate, exchangeRateType, referenceNumber, cancellationToken);
 }

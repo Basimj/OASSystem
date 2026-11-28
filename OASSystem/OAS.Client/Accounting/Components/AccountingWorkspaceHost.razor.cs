@@ -1790,6 +1790,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                             CurrencyId = dto.CurrencyId,
                             IsDefault = dto.IsDefault,
                             RequiresOpenShift = dto.RequiresOpenShift,
+                            MovementType = dto.MovementType,
                             IsActive = dto.IsActive,
                             RowVersion = dto.RowVersion
                         };
@@ -2746,7 +2747,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                             line.CashAccountId.Value,
                             line.CurrencyId,
                             $"{label} - الصندوق"))
-                        return false;
+                        return RejectVoucherLine(line, i + 1, "الصندوق غير صالح للعملية أو لا يسمح نوع حركته بها.");
                     break;
 
                 case UiPaymentMethodKind.BankTransfer or UiPaymentMethodKind.Cheque or UiPaymentMethodKind.Card
@@ -2806,6 +2807,13 @@ public partial class AccountingWorkspaceHost : IDisposable
             return false;
         }
 
+        var type = Workspace.ActiveTab?.EntityType;
+        if ((type == AccountingEntityType.ReceiptVouchers && cash.MovementType == CashAccountMovementType.PaymentOnly) ||
+            ((type == AccountingEntityType.PaymentVouchers || type == AccountingEntityType.Expenses) && cash.MovementType == CashAccountMovementType.ReceiptOnly))
+        {
+            Snackbar.Warning($"{fieldLabel}: نوع حركة الصندوق لا يسمح بهذه العملية.");
+            return false;
+        }
         var lookup = await BuildCashAccountLookupAsync(cash, requiredCurrencyId, CancellationToken.None);
         if (!lookup.Disabled)
         {
@@ -2867,6 +2875,9 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private async Task SaveCashAccountAsync(AccountingTabState tab, CashAccountEditor.FormModel model)
     {
+        model.MovementError = null;
+        model.ConfigurationError = null;
+        var movementChanged = false;
         if (string.IsNullOrWhiteSpace(model.Name) || !model.CurrencyId.HasValue)
         {
             Snackbar.Warning("اسم الصندوق وعملته مطلوبان.");
@@ -2880,6 +2891,26 @@ public partial class AccountingWorkspaceHost : IDisposable
             {
                 Snackbar.Warning("لا يمكن تغيير عملة صندوق موجود. أنشئ صندوقًا جديدًا عند الحاجة إلى عملة مختلفة.");
                 return;
+            }
+            if (current is not null)
+            {
+                movementChanged = current.MovementType != model.MovementType;
+                if (movementChanged || (current.IsActive && !model.IsActive))
+                {
+                    try
+                    {
+                        if ((await GetActiveCashShiftAccountIdsAsync(CancellationToken.None)).Contains(current.Id))
+                        {
+                            ShowCashConfigurationConflict(model, movementChanged);
+                            return;
+                        }
+                    }
+                    catch (ApiClientException ex) when (ex.StatusCode == 403)
+                    {
+                        // Users permitted to edit cash accounts may not have shift viewing rights.
+                        // In this case rely on the authoritative server check.
+                    }
+                }
             }
         }
         if (model.IsDefault && model.IsActive)
@@ -2910,14 +2941,35 @@ public partial class AccountingWorkspaceHost : IDisposable
                 return;
             }
 
-            result = await AccountingService.CreateCashAccountAsync(new CreateCashAccountRequest(model.Code.Trim(), model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive, model.RequiresOpenShift));
+            result = await AccountingService.CreateCashAccountAsync(new CreateCashAccountRequest(model.Code.Trim(), model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive, model.RequiresOpenShift, model.MovementType));
         }
         else
         {
             EnsureEntityIdAndRowVersion(tab, model.RowVersion);
-            result = await AccountingService.UpdateCashAccountAsync(tab.EntityId!.Value, new UpdateCashAccountRequest(model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive, model.RowVersion, model.RequiresOpenShift));
+            try
+            {
+                result = await AccountingService.UpdateCashAccountAsync(tab.EntityId!.Value, new UpdateCashAccountRequest(model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive, model.RowVersion, model.RequiresOpenShift, model.MovementType));
+            }
+            catch (ApiClientException ex) when (ex.Error.Code == "cash_account_active_shift")
+            {
+                ShowCashConfigurationConflict(model, movementChanged);
+                return;
+            }
+            catch (ApiClientException ex) when (ex.Error.Code == "linked_account_header_invalid")
+            {
+                model.ConfigurationError = ex.Error.Message;
+                return;
+            }
         }
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"{result.Code} - {result.Name}", "تم حفظ الصندوق بنجاح.");
+    }
+
+    private static void ShowCashConfigurationConflict(CashAccountEditor.FormModel model, bool movementChanged)
+    {
+        if (movementChanged)
+            model.MovementError = "أغلق الوردية المفتوحة أو قيد الإغلاق قبل تغيير نوع حركة الصندوق.";
+        else
+            model.ConfigurationError = "أغلق الوردية المفتوحة أو قيد الإغلاق قبل تعطيل الصندوق أو تغيير حسابه أو عملته.";
     }
 
     private async Task SaveBankAccountAsync(AccountingTabState tab, BankAccountEditor.FormModel model)
@@ -3959,7 +4011,7 @@ public partial class AccountingWorkspaceHost : IDisposable
     private async Task<IReadOnlyList<UiLookupItem>> SearchCashAccountsAsync(string text, CancellationToken cancellationToken)
     {
         var result = await AccountingService.GetCashAccountsPageAsync(
-            new PageRequest { PageNumber = 1, PageSize = PageRequest.MaximumPageSize, Search = text },
+            new PageRequest { PageNumber = 1, PageSize = PageRequest.MaximumPageSize, Search = text, Status = "active", CashReceipt = false },
             cancellationToken);
 
         var lookups = await Task.WhenAll(result.Items.Select(x => BuildCashAccountLookupAsync(x, null, cancellationToken)));
@@ -3983,6 +4035,13 @@ public partial class AccountingWorkspaceHost : IDisposable
         return lookups;
     }
 
+    private async Task<IReadOnlyList<UiLookupItem>> SearchPaymentCashAccountsAsync(string text, CancellationToken cancellationToken)
+    {
+        var items = await SearchCashAccountsAsync(text, cancellationToken);
+        return items.Where(x => Guid.TryParse(x.Value, out var id) && _cashAccountDtos.TryGetValue(id, out var cash) &&
+            cash.IsActive && cash.MovementType != CashAccountMovementType.ReceiptOnly).ToArray();
+    }
+
     private async Task<IReadOnlyList<UiLookupItem>> SearchCashAccountsByCurrencyAsync(
         Guid? currencyId,
         string text,
@@ -3996,13 +4055,19 @@ public partial class AccountingWorkspaceHost : IDisposable
             {
                 PageNumber = 1,
                 PageSize = PageRequest.MaximumPageSize,
-                Search = text
+                Search = text,
+                Status = "active", CashCurrencyId = currencyId,
+                CashReceipt = Workspace.ActiveTab?.EntityType == AccountingEntityType.ReceiptVouchers
             },
             cancellationToken);
 
         foreach (var cash in result.Items) _cashAccountDtos[cash.Id] = cash;
         return await Task.WhenAll(
-            result.Items.Select(x => BuildCashAccountLookupAsync(x, currencyId, cancellationToken)));
+            result.Items.Where(x => x.IsActive && x.CurrencyId == currencyId &&
+                (Workspace.ActiveTab?.EntityType == AccountingEntityType.ReceiptVouchers
+                    ? x.MovementType != CashAccountMovementType.PaymentOnly
+                    : x.MovementType != CashAccountMovementType.ReceiptOnly))
+                .Select(x => BuildCashAccountLookupAsync(x, currencyId, cancellationToken)));
     }
 
     private async Task<IReadOnlyList<UiLookupItem>> SearchBankAccountsByCurrencyAsync(
@@ -5187,7 +5252,8 @@ public partial class AccountingWorkspaceHost : IDisposable
             "fa-solid fa-vault",
             [
                 new("الحساب المحاسبي", GetAccountLookup(x.AccountId)?.PrimaryText ?? "الحساب غير متاح"),
-                new("افتراضي", x.IsDefault ? "نعم" : "لا")
+                new("افتراضي", x.IsDefault ? "نعم" : "لا"),
+                new("نوع الحركة", x.MovementType switch { CashAccountMovementType.ReceiptOnly => "وارد فقط", CashAccountMovementType.PaymentOnly => "صادر فقط", _ => "وارد وصادر" })
             ],
             x.IsActive ? "نشط" : "غير نشط",
             x.IsActive ? "active" : "inactive",

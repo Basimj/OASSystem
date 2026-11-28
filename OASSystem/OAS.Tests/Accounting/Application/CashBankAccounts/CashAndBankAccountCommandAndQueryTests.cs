@@ -177,6 +177,24 @@ public class CashAndBankAccountCommandAndQueryTests
     }
 
     [Test]
+    public async Task UpdateCashAccountCommandHandler_DirectionOnlyDoesNotSynchronizeLedger()
+    {
+        var existing = CashAccount.Create(Guid.NewGuid(), "CASH-000124", "الصندوق", _glAccountId,
+            _currencyId, false, true);
+        await _cashRepository.AddAsync(existing);
+        var handler = new UpdateCashAccountCommandHandler(_cashRepository, _currencyRepository, _linkedAccounts, _cashMapper);
+        var request = new UpdateCashAccountRequest(existing.Name, _currencyId, false, true,
+            Convert.ToBase64String(existing.RowVersion), MovementType: OAS.Contracts.Accounting.CashAccounts.CashAccountMovementType.ReceiptOnly);
+        var result = await handler.Handle(new UpdateCashAccountCommand(existing.Id, request), CancellationToken.None);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.MovementType, Is.EqualTo(OAS.Domain.Accounting.Enums.CashAccountMovementType.ReceiptOnly));
+            Assert.That(result.AccountId, Is.EqualTo(_glAccountId));
+            Assert.That(_linkedAccounts.LastSynchronizedAccountId, Is.Null);
+        });
+    }
+
+    [Test]
     public async Task GetCashAccountByIdQueryHandler_ReturnsMappedDto()
     {
         var existing = CashAccount.Create(

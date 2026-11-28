@@ -497,7 +497,7 @@ public sealed class SalesSettlementService(
             line.BankAccountId,
             line.SettlementAccountId,
             line.ReferenceNumber,
-            cancellationToken);
+            cancellationToken, isReceipt: true);
         var rate = await exchangeRates.ResolveAsync(
             line.CurrencyId,
             documentDate,

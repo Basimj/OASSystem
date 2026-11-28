@@ -48,6 +48,25 @@ public sealed class CashShiftMovementSqlServerTests
             db.Add(shift);
             await db.SaveChangesAsync();
 
+            // A generic repository update marks every scalar property modified.
+            // Ordinary settings must still be editable with an open shift.
+            box.UpdateDetails(box.Code, "Renamed box", box.AccountId, box.CurrencyId, true);
+            db.Set<CashAccount>().Update(box);
+            await db.SaveChangesAsync();
+            Assert.That(box.Name, Is.EqualTo("Renamed box"));
+            Assert.That(box.IsDefault, Is.True);
+
+            var boxId = box.Id;
+            var shiftId = shift.Id;
+            box.SetMovementType(CashAccountMovementType.ReceiptOnly);
+            db.Set<CashAccount>().Update(box);
+            var configurationError = Assert.ThrowsAsync<ConflictException>(async () => await db.SaveChangesAsync());
+            Assert.That(configurationError!.Code, Is.EqualTo("cash_account_active_shift"));
+            db.ChangeTracker.Clear();
+            box = await db.Set<CashAccount>().SingleAsync(x => x.Id == boxId);
+            shift = await db.Set<CashShift>().SingleAsync(x => x.Id == shiftId);
+            Assert.That(box.MovementType, Is.EqualTo(CashAccountMovementType.ReceiptAndPayment));
+
             JournalEntry MakeJournal(string number, decimal signedAmount, DateTime at)
             {
                 var journal = JournalEntry.Create(Guid.NewGuid(), number, JournalType.Manual, date, date, period.Id,
@@ -86,6 +105,15 @@ public sealed class CashShiftMovementSqlServerTests
             db.Add(later);
             await db.SaveChangesAsync();
             Assert.That(later.Lines.All(x => !x.CashShiftId.HasValue), Is.True);
+            box = await db.Set<CashAccount>().SingleAsync(x => x.Id == box.Id);
+            Assert.That(box.MovementType, Is.EqualTo(CashAccountMovementType.ReceiptAndPayment));
+            box.SetMovementType(CashAccountMovementType.ReceiptOnly);
+            await db.SaveChangesAsync();
+            db.Add(MakeJournal("SHIFT-WRONG-DIRECTION", -1m, DateTime.UtcNow));
+            Assert.ThrowsAsync<ConflictException>(async () => await db.SaveChangesAsync());
+            db.ChangeTracker.Clear();
+            db.Add(MakeJournal("SHIFT-ALLOWED-DIRECTION", 1m, DateTime.UtcNow));
+            await db.SaveChangesAsync();
         }
         finally
         {

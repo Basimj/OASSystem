@@ -12,14 +12,24 @@ public sealed class SettlementAccountResolver(
     IReadRepository<Account, Guid> accounts)
     : ISettlementAccountResolver
 {
-    public async Task<SettlementAccountResolution> ResolveAsync(
+    public Task<SettlementAccountResolution> ResolveAsync(
         PaymentMethod paymentMethod,
         Guid currencyId,
         Guid? cashAccountId,
         Guid? bankAccountId,
         Guid? otherSettlementAccountId,
         string? referenceNumber,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        ResolveCoreAsync(paymentMethod, currencyId, cashAccountId, bankAccountId, otherSettlementAccountId, referenceNumber, cancellationToken, null);
+
+    public Task<SettlementAccountResolution> ResolveAsync(PaymentMethod paymentMethod, Guid currencyId,
+        Guid? cashAccountId, Guid? bankAccountId, Guid? otherSettlementAccountId, string? referenceNumber,
+        CancellationToken cancellationToken, bool isReceipt) =>
+        ResolveCoreAsync(paymentMethod, currencyId, cashAccountId, bankAccountId, otherSettlementAccountId, referenceNumber, cancellationToken, isReceipt);
+
+    private async Task<SettlementAccountResolution> ResolveCoreAsync(PaymentMethod paymentMethod, Guid currencyId,
+        Guid? cashAccountId, Guid? bankAccountId, Guid? otherSettlementAccountId, string? referenceNumber,
+        CancellationToken cancellationToken, bool? isReceipt)
     {
         return paymentMethod switch
         {
@@ -29,7 +39,7 @@ public sealed class SettlementAccountResolver(
                     cashAccountId,
                     bankAccountId,
                     otherSettlementAccountId,
-                    cancellationToken),
+                    cancellationToken, isReceipt),
 
             PaymentMethod.BankTransfer
                 or PaymentMethod.Card
@@ -67,7 +77,7 @@ public sealed class SettlementAccountResolver(
         Guid? cashId,
         Guid? bankId,
         Guid? otherId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool? isReceipt)
     {
         /*
          * ›Ì «·œ›⁄ «·‰ﬁœÌ ÌÃ» √‰ ÌÊÃœ ’‰œÊﬁ Ê«Õœ ›ﬁÿ.
@@ -126,6 +136,8 @@ public sealed class SettlementAccountResolver(
                 "«·’‰œÊﬁ «·„Õœœ €Ì— ‰‘ÿ.");
         }
 
+
+        if (isReceipt.HasValue) OAS.Application.Accounting.CashAccounts.CashAccountMovementPolicy.EnsureAllowed(cash, isReceipt.Value);
 
         if (!cash.CurrencyId.HasValue ||
             cash.CurrencyId.Value != currencyId)

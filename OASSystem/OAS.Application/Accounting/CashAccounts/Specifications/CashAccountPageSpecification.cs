@@ -17,6 +17,10 @@ public sealed class CashAccountPageSpecification
         var status = normalized.Status ?? string.Empty;
         var search = normalized.Search ?? string.Empty;
         specification.Where(x =>
+            (!normalized.CashCurrencyId.HasValue || x.CurrencyId == normalized.CashCurrencyId) &&
+            (!normalized.CashReceipt.HasValue || (normalized.CashReceipt.Value
+                ? x.MovementType != OAS.Domain.Accounting.Enums.CashAccountMovementType.PaymentOnly
+                : x.MovementType != OAS.Domain.Accounting.Enums.CashAccountMovementType.ReceiptOnly)) &&
             (status != "active" || x.IsActive) &&
             (status != "inactive" || !x.IsActive) &&
             (search == string.Empty || x.Code.Contains(search) ||

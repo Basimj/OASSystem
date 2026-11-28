@@ -97,7 +97,7 @@ public sealed class EmployeeLoanAccountingPort(
     {
         var settlement = await settlements.ResolveAsync(request.Date, SettlementPartyType.Employee, null, null, request.EmployeeId, null, null,
             (PaymentMethod)(byte)request.PaymentMethod, request.CashAccountId, request.BankAccountId, request.SettlementAccountId, request.CurrencyId,
-            request.Amount, request.ExchangeRate, (ExchangeRateType)(byte)request.ExchangeRateType, request.ReferenceNumber, ct);
+            request.Amount, request.ExchangeRate, (ExchangeRateType)(byte)request.ExchangeRateType, request.ReferenceNumber, ct, isReceipt: false);
         var (settings, baseCurrency) = await GetBaseCurrencyAsync(ct);
         var id = Guid.NewGuid();
         var number = await NextUniquePaymentNumberAsync(request.Date.Year, ct);
@@ -119,7 +119,7 @@ public sealed class EmployeeLoanAccountingPort(
     {
         var settlement = await settlements.ResolveAsync(request.Date, SettlementPartyType.Employee, null, null, request.EmployeeId, null, null,
             (PaymentMethod)(byte)request.PaymentMethod, request.CashAccountId, request.BankAccountId, request.SettlementAccountId, request.CurrencyId,
-            request.Amount, request.ExchangeRate, (ExchangeRateType)(byte)request.ExchangeRateType, request.ReferenceNumber, ct);
+            request.Amount, request.ExchangeRate, (ExchangeRateType)(byte)request.ExchangeRateType, request.ReferenceNumber, ct, isReceipt: true);
         var (settings, baseCurrency) = await GetBaseCurrencyAsync(ct);
         var id = Guid.NewGuid();
         var number = await NextUniqueReceiptNumberAsync(request.Date.Year, ct);

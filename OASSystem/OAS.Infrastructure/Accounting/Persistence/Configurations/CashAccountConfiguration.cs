@@ -8,7 +8,7 @@ public sealed class CashAccountConfiguration : IEntityTypeConfiguration<CashAcco
 {
     public void Configure(EntityTypeBuilder<CashAccount> builder)
     {
-        builder.ToTable("tbl_CashAccounts", "dbo");
+        builder.ToTable("tbl_CashAccounts", "dbo", t => t.HasCheckConstraint("CK_CashAccounts_MovementType", "[MovementType] IN (1, 2, 3)"));
 
         builder.HasKey(x => x.Id);
 
@@ -31,6 +31,7 @@ public sealed class CashAccountConfiguration : IEntityTypeConfiguration<CashAcco
         builder.Property(x => x.CurrencyId);
 
         builder.Property(x => x.RequiresOpenShift).IsRequired();
+        builder.Property(x => x.MovementType).HasConversion<byte>().HasColumnType("tinyint").HasDefaultValue(OAS.Domain.Accounting.Enums.CashAccountMovementType.ReceiptAndPayment).IsRequired();
 
         builder.Property(x => x.IsDefault)
             .IsRequired();

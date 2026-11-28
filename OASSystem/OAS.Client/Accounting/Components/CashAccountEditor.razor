@@ -2,6 +2,7 @@
 @using OAS.UiLib.Components.Accounting.Workspace
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
+@using OAS.Contracts.Accounting.CashAccounts
 
 <UiAccountingEditorSurface AdditionalCssClass="oas-cashbank-editor">
     <div class="oas-cashbank-editor__intro">
@@ -38,6 +39,18 @@
                     <strong>يُنشأ تلقائيًا عند الحفظ</strong>
                 </div>
             }
+            <div>
+                <label for="cash-movement-type">نوع الحركة</label>
+                <select id="cash-movement-type" class="@(string.IsNullOrWhiteSpace(Model.MovementError) ? "form-select" : "form-select is-invalid")" aria-invalid="@(!string.IsNullOrWhiteSpace(Model.MovementError))" value="@Model.MovementType" @onchange="OnMovementChanged" disabled="@(!IsEditable)">
+                    <option value="ReceiptOnly">وارد فقط (قبض)</option>
+                    <option value="ReceiptAndPayment">وارد وصادر (قبض وصرف)</option>
+                    <option value="PaymentOnly">صادر فقط (صرف)</option>
+                </select>
+                @if (!string.IsNullOrWhiteSpace(Model.MovementError))
+                {
+                    <div class="text-danger" role="alert">@Model.MovementError</div>
+                }
+            </div>
         </UiAccountingFormGrid>
         @if (Model.AccountId.HasValue)
         {
@@ -57,6 +70,10 @@
             <UiCheckbox Label="يتطلب وردية مفتوحة" Value="@Model.RequiresOpenShift"
                         ValueChanged="OnRequiresOpenShiftChanged" Disabled="@(!IsEditable)" />
         </UiAccountingCheckGroup>
+        @if (!string.IsNullOrWhiteSpace(Model.ConfigurationError))
+        {
+            <p class="text-danger" role="alert">@Model.ConfigurationError</p>
+        }
         <p class="oas-cashbank-editor__hint">يمكن تعيين صندوق افتراضي واحد نشط لكل عملة. لا يؤدي تغيير الافتراضي إلى تعديل حركة سابقة.</p>
     </UiAccountingFormSection>
 </UiAccountingEditorSurface>
@@ -69,6 +86,9 @@
         public string Name { get; set; } = string.Empty;
         public Guid? AccountId { get; set; }
         public Guid? CurrencyId { get; set; }
+        public CashAccountMovementType MovementType { get; set; } = CashAccountMovementType.ReceiptAndPayment;
+        public string? MovementError { get; set; }
+        public string? ConfigurationError { get; set; }
         public bool RequiresOpenShift { get; set; }
         public bool IsDefault { get; set; }
         public bool IsActive { get; set; } = true;
@@ -86,9 +106,14 @@
     private string? AccountRoute => Model.AccountId.HasValue ? $"/accounting/accounts/{Model.AccountId.Value:D}" : null;
     private Task OnChanged() => OnModelChanged.InvokeAsync();
     private async Task OnCodeChanged(string? value) { Model.Code = value ?? string.Empty; Model.CodeError = null; await OnChanged(); }
-    private async Task OnNameChanged(string? value) { Model.Name = value ?? string.Empty; await OnChanged(); }
+    private async Task OnNameChanged(string? value) { Model.Name = value ?? string.Empty; Model.ConfigurationError = null; await OnChanged(); }
     private async Task OnCurrencyChanged(string? value) { Model.CurrencyId = Guid.TryParse(value, out var id) ? id : null; await OnChanged(); }
+    private async Task OnMovementChanged(ChangeEventArgs args)
+    {
+        if (Enum.TryParse<CashAccountMovementType>(args.Value?.ToString(), out var value) && Enum.IsDefined(value))
+        { Model.MovementType = value; Model.MovementError = null; await OnChanged(); }
+    }
     private async Task OnDefaultChanged(bool value) { Model.IsDefault = value; await OnChanged(); }
     private async Task OnRequiresOpenShiftChanged(bool value) { Model.RequiresOpenShift = value; await OnChanged(); }
-    private async Task OnActiveChanged(bool value) { Model.IsActive = value; await OnChanged(); }
+    private async Task OnActiveChanged(bool value) { Model.IsActive = value; Model.ConfigurationError = null; await OnChanged(); }
 }

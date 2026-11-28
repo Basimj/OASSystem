@@ -38,8 +38,12 @@ public sealed class UpdateCashAccountCommandHandler(
                 cancellationToken) > 0)
             throw new ConflictException("cash_default_already_exists", "An active default cash account already exists for this currency.");
 
+        var previousName = entity.Name;
+        var previousActive = entity.IsActive;
         mapper.Update(request.Data, entity);
-        await linkedAccounts.SynchronizeAsync(entity.AccountId, entity.Name, entity.IsActive, cancellationToken);
+        // Direction, default and shift settings do not change the linked ledger.
+        if (!string.Equals(previousName, entity.Name, StringComparison.Ordinal) || previousActive != entity.IsActive)
+            await linkedAccounts.SynchronizeAsync(entity.AccountId, entity.Name, entity.IsActive, cancellationToken);
         repository.Update(entity);
         return entity;
     }

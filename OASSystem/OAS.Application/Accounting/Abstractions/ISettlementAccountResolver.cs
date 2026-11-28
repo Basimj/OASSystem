@@ -17,4 +17,14 @@ public interface ISettlementAccountResolver
         Guid? otherSettlementAccountId,
         string? referenceNumber,
         CancellationToken cancellationToken = default);
+
+    Task<SettlementAccountResolution> ResolveAsync(
+        PaymentMethod paymentMethod,
+        Guid currencyId,
+        Guid? cashAccountId,
+        Guid? bankAccountId,
+        Guid? otherSettlementAccountId,
+        string? referenceNumber,
+        CancellationToken cancellationToken, bool isReceipt) =>
+        ResolveAsync(paymentMethod, currencyId, cashAccountId, bankAccountId, otherSettlementAccountId, referenceNumber, cancellationToken);
 }

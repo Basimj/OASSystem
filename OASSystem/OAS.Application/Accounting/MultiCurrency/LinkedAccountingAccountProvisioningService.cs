@@ -35,6 +35,11 @@ public sealed class LinkedAccountingAccountProvisioningService(
     {
         var account = await accounts.GetForUpdateAsync(accountId, cancellationToken)
             ?? throw new NotFoundException(nameof(Account), accountId);
+        // Do not try to rewrite a legacy header as a linked posting ledger.
+        // Relinking or correcting its classification requires an explicit accounting review.
+        if (account.AccountType == AccountType.Header)
+            throw new ConflictException("linked_account_header_invalid",
+                $"الحساب المحاسبي المرتبط ({account.Code} - {account.NameAr}) حساب رئيسي لا يقبل الترحيل. راجع ربط الحساب في شجرة الحسابات قبل تغيير الاسم أو الحالة.");
         account.UpdateDetails(
             account.Code,
             nameAr,

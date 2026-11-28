@@ -181,7 +181,7 @@
         .Sum(x => x.AppliedSourceBaseAmount) ?? 0m;
     private string BaseCurrencyCode => Credit?.BaseCurrencyCode ?? "";
     private string SelectedCurrencyCode => _currencies.FirstOrDefault(x => x.Id == _currencyId)?.Code ?? "";
-    private IReadOnlyList<CashAccountDto> AvailableCashAccounts => _cash.Where(x => x.IsActive && x.CurrencyId == _currencyId).ToArray();
+    private IReadOnlyList<CashAccountDto> AvailableCashAccounts => _cash.Where(x => x.IsActive && x.MovementType != OAS.Contracts.Accounting.CashAccounts.CashAccountMovementType.ReceiptOnly && x.CurrencyId == _currencyId).ToArray();
     private IReadOnlyList<BankAccountDto> AvailableBankAccounts => _banks.Where(x => x.IsActive && x.CurrencyId == _currencyId).ToArray();
 
     protected override async Task OnInitializedAsync()

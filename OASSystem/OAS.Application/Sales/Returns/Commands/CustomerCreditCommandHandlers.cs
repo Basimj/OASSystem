@@ -178,7 +178,7 @@ public sealed class RefundCustomerReturnCreditCommandHandler(
         var date=DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
         var payment=await resolver.ResolveAsync(date,SettlementPartyType.Customer,request.CustomerId,
             null,null,null,null,paymentMethod,d.CashAccountId,d.BankAccountId,d.SettlementAccountId,
-            d.CurrencyId,d.Amount,null,ExchangeRateType.Accounting,d.ReferenceNumber,ct);
+            d.CurrencyId,d.Amount,null,ExchangeRateType.Accounting,d.ReferenceNumber,ct,isReceipt: false);
         if (payment.CustomerId!=request.CustomerId || payment.CounterpartyAccountId!=customer.AccountId)
             throw new ConflictException("customer_refund_account_mismatch","الحساب المحاسبي لسند الصرف لا يطابق العميل.");
         var (_,available)=await ledger.GetAvailableReturnAsync(request.CustomerId,source.Id,ct);

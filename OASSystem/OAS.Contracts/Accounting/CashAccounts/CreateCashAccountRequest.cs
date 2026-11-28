@@ -6,4 +6,5 @@ public sealed record CreateCashAccountRequest(
     Guid CurrencyId,
     bool IsDefault = false,
     bool IsActive = true,
-    bool RequiresOpenShift = false);
+    bool RequiresOpenShift = false,
+    CashAccountMovementType MovementType = CashAccountMovementType.ReceiptAndPayment);

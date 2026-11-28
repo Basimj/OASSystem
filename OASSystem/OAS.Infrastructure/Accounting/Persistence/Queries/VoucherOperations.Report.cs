@@ -57,7 +57,7 @@ public sealed partial class VoucherOperations
         var ledger=await db.Set<JournalEntryLine>().AsNoTracking().Where(x=>ledgerIds.Contains(x.JournalEntryId)).Take(250001).ToListAsync(ct);
         if(ledger.Count>250000)throw Error("عدد القيود كبير؛ اختر فترة أقصر.");
         var byJournal=ledger.ToLookup(x=>x.JournalEntryId);
-        var accounts=await db.Set<Account>().AsNoTracking().Select(a=>new CashBankReportAccountDto(a.Id,a.Code,a.NameAr,"account",null,a.IsActive)).ToListAsync(ct);
+        var accounts=await db.Set<Account>().AsNoTracking().Select(a=>new CashBankReportAccountDto(a.Id,a.Code,a.NameAr,"account",null,a.IsActive,null)).ToListAsync(ct);
         var accountNames=accounts.ToDictionary(a=>a.AccountId,a=>a.Code+" - "+a.Name);
         var cash=await db.Set<CashAccount>().AsNoTracking().ToDictionaryAsync(x=>x.Id,ct);
         var banks=await db.Set<BankAccount>().AsNoTracking().ToDictionaryAsync(x=>x.Id,ct);

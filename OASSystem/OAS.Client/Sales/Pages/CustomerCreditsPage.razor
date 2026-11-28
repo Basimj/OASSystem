@@ -229,7 +229,7 @@
         : 0m;
 
     private IReadOnlyList<CashAccountDto> AvailableCashAccounts =>
-        _currencyId == Guid.Empty ? [] : _cash.Where(x => x.IsActive && x.CurrencyId == _currencyId).ToArray();
+        _currencyId == Guid.Empty ? [] : _cash.Where(x => x.IsActive && x.MovementType != OAS.Contracts.Accounting.CashAccounts.CashAccountMovementType.ReceiptOnly && x.CurrencyId == _currencyId).ToArray();
 
     private IReadOnlyList<BankAccountDto> AvailableBankAccounts =>
         _currencyId == Guid.Empty ? [] : _banks.Where(x => x.IsActive && x.CurrencyId == _currencyId).ToArray();
