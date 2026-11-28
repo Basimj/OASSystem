@@ -1,8 +1,119 @@
-/* Layout only; the inventory catalog owns the shared design and colors. */
+/* Layout only; inventory catalog owns the shared design and colors. */
 .opening-workspace { scrollbar-gutter: stable; }
+/* The toolbar is sized to the workspace, not the viewport. Keep menus visible
+   and avoid introducing a horizontal scroll container. */
+.opening-workspace > .inv-toolbar {
+    flex-wrap: nowrap;
+    gap: 4px;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+}
+.opening-workspace > .inv-toolbar > .inv-actions {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    gap: 3px;
+    white-space: nowrap;
+}
+.opening-workspace.oas-inventory-catalog > .inv-toolbar > .inv-actions ::deep > .ui-button {
+    flex: 0 0 auto;
+    min-inline-size: 0;
+    padding-inline: 5px;
+    gap: 3px;
+}
+.opening-workspace > .inv-toolbar > .inv-actions > .inv-excel { flex: 0 0 auto; }
+.opening-workspace > .inv-toolbar > .inv-actions > .inv-excel > summary {
+    padding-inline: 5px;
+    gap: 3px;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+.opening-workspace > .inv-toolbar > .inv-toolbar-navigation {
+    flex: 1 1 0;
+    flex-wrap: nowrap;
+    min-inline-size: 0;
+    max-inline-size: none;
+    gap: 3px;
+}
+.opening-workspace > .inv-toolbar > .inv-toolbar-navigation ::deep .inv-record-nav {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    gap: 3px;
+}
+.opening-workspace > .inv-toolbar > .inv-toolbar-navigation ::deep .ui-search-input {
+    flex: 1 1 0;
+    min-inline-size: 0;
+    width: 0;
+    padding-inline: 5px;
+    gap: 3px;
+    box-sizing: border-box;
+}
+.opening-workspace > .inv-toolbar > .inv-toolbar-navigation ::deep .ui-search-input input {
+    min-inline-size: 0;
+    width: 0;
+}
+.opening-excel-icon, .opening-more { display: none; }
+/* Compact icons retain the same commands and accessible names. The existing
+   catalog is already an inline-size container. */
+@container (max-width: 1000px) {
+    .opening-workspace.oas-inventory-catalog > .inv-toolbar > .inv-actions ::deep > .ui-button {
+        inline-size: 30px;
+        padding-inline: 0;
+        gap: 0;
+        justify-content: center;
+    }
+    .opening-workspace > .inv-toolbar > .inv-actions ::deep > .ui-button > span { display: none; }
+    .opening-workspace > .inv-toolbar > .inv-actions > .inv-excel > summary { inline-size: 35px; padding-inline: 0; justify-content: center; }
+    .opening-excel-label { display: none; }
+    .opening-excel-icon { display: inline-block; }
+}
+@container (max-width: 530px) {
+    .opening-workspace.oas-inventory-catalog > .inv-toolbar > .inv-actions ::deep > .ui-button { inline-size: 26px; }
+    .opening-workspace > .inv-toolbar > .inv-actions > .inv-excel > summary { inline-size: 28px; }
+    .opening-workspace > .inv-toolbar > .inv-actions > .inv-excel > summary > .fa-angle-down { display: none; }
+    .opening-workspace > .inv-toolbar > .inv-toolbar-navigation ::deep .inv-record-nav button { min-inline-size: 24px; inline-size: 24px; padding-inline: 0; }
+    .opening-workspace > .inv-toolbar > .inv-toolbar-navigation ::deep .ui-search-input { padding-inline: 3px; gap: 2px; }
+    .opening-workspace > .inv-toolbar > .inv-toolbar-navigation ::deep .ui-search-input button { flex: 0 0 14px; inline-size: 14px; }
+}
+/* For exceptionally narrow workspaces, group secondary commands rather than
+   hide functionality or force horizontal scrolling. */
+@container (max-width: 440px) {
+    .opening-workspace > .inv-toolbar > .inv-actions ::deep > .opening-secondary-action { display: none; }
+    .opening-workspace > .inv-toolbar > .inv-actions > .opening-more { display: block; }
+    .opening-workspace > .inv-toolbar > .inv-actions > .opening-more > .inv-excel-menu { inset-inline-start: 0; inset-inline-end: auto; }
+}
+@container (max-width: 320px) {
+    .opening-workspace > .inv-toolbar { gap: 2px; }
+    .opening-workspace > .inv-toolbar > .inv-actions, .opening-workspace > .inv-toolbar > .inv-toolbar-navigation { gap: 2px; }
+    .opening-workspace > .inv-toolbar > .inv-toolbar-navigation ::deep .inv-record-nav { gap: 1px; }
+    .opening-workspace.oas-inventory-catalog > .inv-toolbar > .inv-actions ::deep > .ui-button { inline-size: 24px; }
+    .opening-workspace > .inv-toolbar > .inv-actions > .inv-excel > summary { inline-size: 24px; }
+    .opening-workspace > .inv-toolbar > .inv-toolbar-navigation ::deep .inv-record-nav button { min-inline-size: 21px; inline-size: 21px; }
+}
 .opening-notes { grid-column: span 3; }
 .opening-lines-scroll { overflow: auto; max-height: 46vh; min-width: 0; }
-.opening-lines-table { min-width: 740px; width: 100%; }
+/* Stable column widths in both edit and read modes. The first column receives
+   the remaining width (33% with Delete, 40% without it). */
+.opening-lines-table { min-width: 920px; width: 100%; table-layout: fixed; }
+.opening-lines-table th:nth-child(2) { width: 8%; }  /* Unit */
+.opening-lines-table th:nth-child(3) { width: 11%; } /* Quantity */
+.opening-lines-table th:nth-child(4) { width: 14%; } /* Unit cost */
+.opening-lines-table th:nth-child(5) { width: 12%; } /* Total */
+.opening-lines-table th:nth-child(6) { width: 15%; } /* Notes */
+.opening-lines-table th:nth-child(7) { width: 7%; }  /* Delete (edit only) */
+.opening-lines-table :is(th,td) { box-sizing: border-box; min-width: 0; }
+.opening-lines-table td { white-space: normal; overflow-wrap: anywhere; }
+.opening-lines-table ::deep :is(.ui-input-text,.ui-input-text__field,.ui-input-text__control,.ui-searchable-select,.ui-searchable-select__trigger) {
+    min-width: 0; width: 100%; box-sizing: border-box;
+}
+/* Show the product name and SKU even if they need more than one line. */
+.opening-lines-table ::deep .ui-searchable-select__selected {
+    min-width: 0; flex: 1 1 auto; white-space: normal; overflow-wrap: anywhere;
+    text-overflow: clip; text-align: start; line-height: 1.4;
+}
+.opening-lines-table ::deep :is(.ui-input-text__error,.ui-searchable-select__error) {
+    white-space: normal; overflow-wrap: anywhere;
+}
+.opening-lines-table td:nth-child(7) ::deep .ui-button { padding-inline: 6px; white-space: nowrap; }
 .opening-workspace ::deep .ui-data-table :is(th,td) { text-align: center !important; vertical-align: middle; }
 .opening-lines-table ::deep :is(.ui-searchable-select__label,.ui-input-text > .ui-text-label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 .opening-totals { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 8px; }
@@ -11,3 +122,8 @@
 .opening-import { display: grid; gap: 4px; padding: 6px; }
 .opening-import ::deep input { max-width: 210px; }
 @media (max-width: 800px) { .opening-notes { grid-column: 1 / -1; } }
+
+/* Field validation is scoped to this opening workspace. */
+.opening-lines-error { color: #b91c1c; font-size: var(--oas-font-sm, 12px); line-height: 1.35; padding-block: 4px; }
+.opening-workspace ::deep .ui-input-date__control[aria-invalid="true"] { border-color: #b91c1c !important; }
+.opening-workspace ::deep .ui-input-date__error { color: #b91c1c; }

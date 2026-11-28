@@ -19,24 +19,34 @@
 <section class="oas-inventory-workspace oas-inventory-catalog opening-workspace" dir="rtl" aria-busy="@(Busy ? "true" : "false")">
     <div class="inv-toolbar">
         <div class="inv-actions">
-            <UiButton Text="إضافة جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Disabled="@(Busy || Editing || !Enabled)" OnClick="NewAsync" />
-            <UiButton Text="تعديل" AdditionalCssClass="inv-edit" IconCssClass="fa-solid fa-pen" Size="ControlSize.Small" Disabled="@(Busy || Editing || !Enabled || !Draft)" OnClick="EditAsync" />
-            <UiButton Text="حفظ" AdditionalCssClass="inv-save" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Disabled="@(Busy || !Editing || !Enabled)" OnClick="SaveAsync" />
-            <UiButton Text="إلغاء" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Busy || !Editing)" OnClick="CancelAsync" />
-            <UiButton Text="ترحيل" IconCssClass="fa-solid fa-check-double" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Busy || Editing || !Draft || !Enabled)" OnClick="AskPostAsync" />
-            <UiButton Text="عكس الرصيد" IconCssClass="fa-solid fa-rotate-left" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Busy || Editing || !CanReverse)" OnClick="AskReverseAsync" />
-            <UiButton Text="حذف المسودة" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Busy || Editing || !Draft)" OnClick="AskDeleteAsync" />
-            <UiButton Text="تحديث" AdditionalCssClass="inv-refresh" IconCssClass="fa-solid fa-rotate" Size="ControlSize.Small" Disabled="@(Busy || Editing)" OnClick="RefreshAsync" />
-            <details class="inv-excel"><summary>ملفات Excel <i class="fa-solid fa-angle-down" aria-hidden="true"></i></summary>
+            <UiButton title="إضافة جديد" aria-label="إضافة جديد" Text="إضافة جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Disabled="@(Busy || Editing || !Enabled)" OnClick="NewAsync" />
+            <UiButton title="تعديل" aria-label="تعديل" Text="تعديل" AdditionalCssClass="inv-edit opening-secondary-action" IconCssClass="fa-solid fa-pen" Size="ControlSize.Small" Disabled="@(Busy || Editing || !Enabled || !Draft)" OnClick="EditAsync" />
+            <UiButton title="حفظ" aria-label="حفظ" Text="حفظ" AdditionalCssClass="inv-save" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Disabled="@(Busy || !Editing || !Enabled)" OnClick="SaveAsync" />
+            <UiButton title="إلغاء" aria-label="إلغاء" IconCssClass="fa-solid fa-xmark" Text="إلغاء" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Busy || !Editing)" OnClick="CancelAsync" />
+            <UiButton title="ترحيل" aria-label="ترحيل" AdditionalCssClass="opening-secondary-action" Text="ترحيل" IconCssClass="fa-solid fa-check-double" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Busy || Editing || !Draft || !Enabled)" OnClick="AskPostAsync" />
+            <UiButton title="عكس الرصيد" aria-label="عكس الرصيد" AdditionalCssClass="opening-secondary-action" Text="عكس الرصيد" IconCssClass="fa-solid fa-rotate-left" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Busy || Editing || !CanReverse)" OnClick="AskReverseAsync" />
+            <UiButton title="حذف المسودة" aria-label="حذف المسودة" IconCssClass="fa-solid fa-trash" AdditionalCssClass="opening-secondary-action" Text="حذف المسودة" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Busy || Editing || !Draft)" OnClick="AskDeleteAsync" />
+            <UiButton title="تحديث" aria-label="تحديث" Text="تحديث" AdditionalCssClass="inv-refresh opening-secondary-action" IconCssClass="fa-solid fa-rotate" Size="ControlSize.Small" Disabled="@(Busy || Editing)" OnClick="RefreshAsync" />
+            <details class="inv-excel"><summary title="ملفات Excel" aria-label="ملفات Excel"><span class="opening-excel-label">ملفات Excel</span><i class="fa-solid fa-file-excel opening-excel-icon" aria-hidden="true"></i> <i class="fa-solid fa-angle-down" aria-hidden="true"></i></summary>
                 <div class="inv-excel-menu">
                     <UiButton Text="تحميل القالب" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@Busy" OnClick="TemplateAsync" />
                     <UiButton Text="تصدير السجل" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@Busy" OnClick="ExportAsync" />
                     @if (Editing) { <label class="opening-import">استيراد البنود <InputFile OnChange="ImportAsync" accept=".xlsx" disabled="@Busy" /></label> }
                 </div>
             </details>
+            <details class="inv-excel opening-more">
+                <summary title="المزيد من العمليات" aria-label="المزيد من العمليات"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i></summary>
+                <div class="inv-excel-menu">
+                    <UiButton Text="تعديل" AdditionalCssClass="inv-edit" IconCssClass="fa-solid fa-pen" Size="ControlSize.Small" Disabled="@(Busy || Editing || !Enabled || !Draft)" OnClick="EditAsync" />
+                    <UiButton Text="ترحيل" IconCssClass="fa-solid fa-check-double" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Busy || Editing || !Draft || !Enabled)" OnClick="AskPostAsync" />
+                    <UiButton Text="عكس الرصيد" IconCssClass="fa-solid fa-rotate-left" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Busy || Editing || !CanReverse)" OnClick="AskReverseAsync" />
+                    <UiButton IconCssClass="fa-solid fa-trash" Text="حذف المسودة" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Busy || Editing || !Draft)" OnClick="AskDeleteAsync" />
+                    <UiButton Text="تحديث" AdditionalCssClass="inv-refresh" IconCssClass="fa-solid fa-rotate" Size="ControlSize.Small" Disabled="@(Busy || Editing)" OnClick="RefreshAsync" />
+                </div>
+            </details>
         </div>
         <div class="inv-toolbar-navigation">
-            <UiSearchInput Value="@_search" ValueChanged="SearchAsync" Placeholder="ابحث برقم المستند أو المخزن..." Disabled="@(Busy || Editing)" />
+            <UiSearchInput Value="@_search" ValueChanged="SearchAsync" Placeholder="ابحث برقم المستند أو المخزن..." AriaLabel="ابحث برقم المستند أو المخزن" Disabled="@(Busy || Editing)" />
             <UiInventoryRecordNavigation CanPrevious="@(!Busy && !Editing && Index > 0)" CanNext="@(!Busy && !Editing && Index < Filtered.Count-1)" OnNavigate="NavigateAsync" />
         </div>
     </div>
@@ -57,15 +67,15 @@
         <div class="inv-actions"><UiButton Text="تأكيد" Disabled="@Busy" OnClick="ConfirmAsync" /><UiButton Text="إلغاء" Variant="ButtonVariant.Secondary" OnClick="@(_ => { _confirmation = null; })" /></div>
     }
     @if (!string.IsNullOrWhiteSpace(_error)) { <UiAlert Tone="AlertTone.Danger" Message="@_error" /> }
-    <details class="inv-editor inv-editor-panel" open>
+    <details class="inv-editor inv-editor-panel" @key="_headerKey" open>
         <summary><span><i class="fa-solid fa-file-lines"></i> بيانات الرصيد الافتتاحي</span><i class="fa-solid fa-angle-down inv-editor-chevron"></i></summary>
         <div class="inv-editor-content inv-form-grid">
             <UiInputText Label="رقم المستند" Value="@(_selected?.TransactionNumber ?? (Editing ? "يولد عند الحفظ" : "—"))" Disabled="true" Size="ControlSize.Small" />
-            <UiInputDate Label="تاريخ الرصيد" Value="@_date" ValueChanged="@(v => _date = v)" Disabled="@(Busy || !Editing)" Required="true" Size="ControlSize.Small" />
-            <UiSearchableSelect Label="المخزن" Value="@_warehouse" ValueChanged="@(v => _warehouse = v)" Options="@WarehouseOptions" Disabled="@(Busy || !Editing)" InlineDropdown="true" UseAngleDownIcon="true" Required="true" Size="ControlSize.Small" />
+            <UiInputDate Label="تاريخ الرصيد" Value="@_date" ValueChanged="@(v => _date = v)" ErrorText="@(_showHeaderErrors ? DateError() : null)" Disabled="@(Busy || !Editing)" Required="true" Size="ControlSize.Small" />
+            <UiSearchableSelect Label="المخزن" Value="@_warehouse" ValueChanged="@(v => _warehouse = v)" ErrorText="@(_showHeaderErrors ? WarehouseError() : null)" Options="@WarehouseOptions" Disabled="@(Busy || !Editing)" InlineDropdown="true" UseAngleDownIcon="true" Required="true" Size="ControlSize.Small" />
             <UiInputText Label="العملة الأساسية" Value="@(_info?.CurrencyName ?? "—")" Disabled="true" Size="ControlSize.Small" />
             <UiInputText Label="الحالة" Value="@(_selected is null ? (Editing ? "مسودة" : "—") : OpeningStatus(_selected))" Disabled="true" Size="ControlSize.Small" />
-            <div class="opening-notes"><UiInputText Label="ملاحظات / مرجع النظام السابق" Value="@_notes" ValueChanged="@(v => _notes = v)" Disabled="@(Busy || !Editing)" Size="ControlSize.Small" /></div>
+            <div class="opening-notes"><UiInputText Label="ملاحظات / مرجع النظام السابق" Value="@_notes" ValueChanged="@(v => _notes = v)" ErrorText="@(_showHeaderErrors ? HeaderNotesError() : null)" Disabled="@(Busy || !Editing)" Size="ControlSize.Small" /></div>
         </div>
     </details>
     @if (Editing || _selected is not null)
@@ -77,19 +87,24 @@
                 {
                     <div class="inv-actions"><UiButton Text="إضافة بند" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Disabled="@(Busy || _lines.Count >= 5000)" OnClick="AddLineAsync" /></div>
                 }
+                @if (Editing && _showHeaderErrors && _lines.Count == 0)
+                {
+                    <div class="opening-lines-error" role="alert">أضف بندًا واحدًا على الأقل.</div>
+                }
                 <div class="opening-lines-scroll">
                     <table class="ui-data-table opening-lines-table">
                         <thead><tr><th>الصنف / الرمز</th><th>الوحدة</th><th>الكمية</th><th>تكلفة الوحدة</th><th>الإجمالي</th><th>ملاحظات</th>@if (Editing) { <th>حذف</th> }</tr></thead>
                         <tbody>
+                            @{ var duplicateVariants = DuplicateVariants(); }
                             @foreach (var line in VisibleLines)
                             {
                                 <tr @key="line">
-                                    <td>@if (Editing) { <UiSearchableSelect Label="الصنف" Value="@line.Variant" ValueChanged="@(v => line.Variant = v)" Options="@VariantOptions" InlineDropdown="true" UseAngleDownIcon="true" Required="true" Disabled="@Busy" Size="ControlSize.Small" /> } else { @VariantName(line.Variant) }</td>
+                                    <td>@if (Editing) { <UiSearchableSelect Label="الصنف" Value="@line.Variant" ValueChanged="@(v => line.Variant = v)" ErrorText="@(line.ShowValidationErrors ? VariantError(line, duplicateVariants) : null)" Options="@VariantOptions" InlineDropdown="true" UseAngleDownIcon="true" Required="true" Disabled="@Busy" Size="ControlSize.Small" /> } else { @VariantName(line.Variant) }</td>
                                     <td>@UnitName(line.Variant)</td>
-                                    <td>@if (Editing) { <UiInputText Label="الكمية" Value="@line.Quantity" ValueChanged="@(v => line.Quantity = v ?? "")" ErrorText="@QuantityError(line)" Type="number" min="0.001" step="0.001" Size="ControlSize.Small" Disabled="@Busy" /> } else { @line.Quantity }</td>
-                                    <td>@if (Editing) { <UiInputText Label="التكلفة" Value="@line.Cost" ValueChanged="@(v => line.Cost = v ?? "")" ErrorText="@CostError(line)" Type="number" min="0.01" step="0.01" Size="ControlSize.Small" Disabled="@Busy" /> } else { @line.Cost }</td>
+                                    <td>@if (Editing) { <UiInputText Label="الكمية" Value="@line.Quantity" ValueChanged="@(v => line.Quantity = v ?? "")" ErrorText="@(line.ShowValidationErrors ? QuantityError(line) : null)" Type="number" min="0.001" step="0.001" Size="ControlSize.Small" Disabled="@Busy" /> } else { @line.Quantity }</td>
+                                    <td>@if (Editing) { <UiInputText Label="التكلفة" Value="@line.Cost" ValueChanged="@(v => line.Cost = v ?? "")" ErrorText="@(line.ShowValidationErrors ? CostOrValueError(line) : null)" Type="number" min="0.01" step="0.01" Size="ControlSize.Small" Disabled="@Busy" /> } else { @line.Cost }</td>
                                     <td>@Money(LineValue(line))</td>
-                                    <td>@if (Editing) { <UiInputText Label="ملاحظات" Value="@line.Notes" ValueChanged="@(v => line.Notes = v)" Size="ControlSize.Small" Disabled="@Busy" /> } else { @line.Notes }</td>
+                                    <td>@if (Editing) { <UiInputText Label="ملاحظات" Value="@line.Notes" ValueChanged="@(v => line.Notes = v)" ErrorText="@(line.ShowValidationErrors ? LineNotesError(line) : null)" Size="ControlSize.Small" Disabled="@Busy" /> } else { @line.Notes }</td>
                                     @if (Editing) { <td><UiButton Text="حذف" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@Busy" OnClick="@(_ => RemoveLineAsync(line))" /></td> }
                                 </tr>
                             }
@@ -126,6 +141,8 @@
     private InventoryTransactionDto? _selected;
     private List<OpeningLine> _lines = [];
     private bool Busy, Editing;
+    private bool _showHeaderErrors;
+    private object _headerKey = new();
     private bool Enabled => _info?.Enabled == true;
     private bool Draft => _selected is { Status: InventoryTransactionStatus.Draft, ReferenceType: "InventoryOpening" };
     private bool CanReverse => _selected is { Status: InventoryTransactionStatus.Posted, ReferenceType: "InventoryOpening", ReferenceId: not null } && !IsReversed(_selected.Id);
@@ -144,12 +161,67 @@
     private int Index => Array.FindIndex(Filtered.ToArray(),x => x.Id == _selected?.Id);
     private IReadOnlyList<UiSelectOption> WarehouseOptions => _warehouses.Where(x => x.IsActive || x.Id == _selected?.DestinationWarehouseId).Select(x => new UiSelectOption(x.Id.ToString(),x.Name)).ToArray();
     private IReadOnlyList<UiSelectOption> VariantOptions => _variantOptions;
-    private sealed class OpeningLine { public string? Variant { get; set; } public string Quantity { get; set; } = "1"; public string Cost { get; set; } = "0"; public string? Notes { get; set; } }
+    private sealed class OpeningLine { public string? Variant { get; set; } public string Quantity { get; set; } = "1"; public string Cost { get; set; } = "0"; public bool ShowValidationErrors { get; set; } public string? Notes { get; set; } }
     private static decimal Number(string? value) => decimal.TryParse(value,NumberStyles.Number,CultureInfo.InvariantCulture,out var n) && n >= 0 && n < 10000000000000000m ? n : 0;
     private static decimal LineValue(OpeningLine l) { var q=Number(l.Quantity); var c=Number(l.Cost); return c>0 && q<=9999999999999999.99m/c ? Math.Round(q*c,2) : 0; }
     private static string Money(decimal n) => n.ToString("#,##0.###",CultureInfo.InvariantCulture);
     private static string? QuantityError(OpeningLine l) => Number(l.Quantity)<=0 || Number(l.Quantity)>=1000000000000000m || Math.Round(Number(l.Quantity),3)!=Number(l.Quantity) ? "أدخل كمية موجبة حتى 3 منازل عشرية." : null;
     private static string? CostError(OpeningLine l) => Number(l.Cost)<=0 || Math.Round(Number(l.Cost),2)!=Number(l.Cost) ? "أدخل تكلفة موجبة حتى منزلتين عشريتين." : null;
+    private string? WarehouseError() => !Guid.TryParse(_warehouse, out var id) ||
+        !_warehouses.Any(w => w.Id == id && w.IsActive) ? "اختر مخزنًا فعالًا." : null;
+    private string? DateError() => !_date.HasValue || _date.Value == default
+        ? "حدد تاريخ الرصيد الافتتاحي."
+        : _date.Value > DateOnly.FromDateTime(DateTime.UtcNow) ? "لا يجوز أن يكون تاريخ الرصيد في المستقبل." : null;
+    private string? HeaderNotesError() => _notes?.Length > 1000 ? "الملاحظات لا تتجاوز 1000 حرف." : null;
+    private static string? LineNotesError(OpeningLine line) => line.Notes?.Length > 500 ? "الملاحظات لا تتجاوز 500 حرف." : null;
+    private HashSet<Guid> DuplicateVariants() => _lines
+        .Select(l => Guid.TryParse(l.Variant, out var id) ? id : Guid.Empty)
+        .Where(id => id != Guid.Empty).GroupBy(id => id)
+        .Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
+    private string? VariantError(OpeningLine line, HashSet<Guid> duplicates)
+    {
+        if (!Guid.TryParse(line.Variant, out var id) || id == Guid.Empty)
+            return "اختر الصنف.";
+        if (!_variantsById.TryGetValue(id, out var variant) || !variant.IsActive ||
+            _productsById.GetValueOrDefault(variant.ProductId) is not { IsActive: true, IsStockItem: true })
+            return "اختر صنفًا مخزنيًا فعالًا.";
+        return duplicates.Contains(id) ? "الصنف مكرر في المستند." : null;
+    }
+    private static string? CostOrValueError(OpeningLine line)
+    {
+        var error = CostError(line);
+        if (error is not null) return error;
+        if (QuantityError(line) is null && LineValue(line) <= 0)
+            return "إجمالي البند يجب أن يكون موجبًا وضمن حدود المبالغ.";
+        return null;
+    }
+    private void ResetValidation()
+    {
+        _showHeaderErrors = false;
+        foreach (var line in _lines) line.ShowValidationErrors = false;
+    }
+    private bool ValidateBeforeSave()
+    {
+        _showHeaderErrors = true;
+        var duplicates = DuplicateVariants();
+        var headerInvalid = WarehouseError() is not null || DateError() is not null || HeaderNotesError() is not null;
+        var firstInvalidLine = -1;
+        for (var i = 0; i < _lines.Count; i++)
+        {
+            var line = _lines[i];
+            line.ShowValidationErrors = true;
+            if (firstInvalidLine < 0 && (VariantError(line, duplicates) is not null || QuantityError(line) is not null ||
+                CostOrValueError(line) is not null || LineNotesError(line) is not null))
+                firstInvalidLine = i;
+        }
+        if (headerInvalid) _headerKey = new object(); // Reopen a collapsed header to show its errors.
+        if (firstInvalidLine >= 0 || _lines.Count == 0)
+        {
+            _linePage = firstInvalidLine >= 0 ? firstInvalidLine / 20 + 1 : 1;
+            _panelRevision++; // Reopen the lines panel even if the user collapsed it.
+        }
+        return !headerInvalid && firstInvalidLine < 0 && _lines.Count > 0;
+    }
     private string WarehouseName(Guid? id) => _warehouses.FirstOrDefault(x=>x.Id==id)?.Name ?? "—";
     private string VariantName(string? id) => Guid.TryParse(id,out var key) && _variantsById.TryGetValue(key,out var v) ? $"{v.SKU} - {v.VariantName ?? _productsById.GetValueOrDefault(v.ProductId)?.Name}" : "—";
     private string UnitName(string? id) => Guid.TryParse(id,out var key) && _variantsById.TryGetValue(key,out var v) ? _units.FirstOrDefault(x=>x.Id==v.UnitId)?.Name ?? "—" : "—";
@@ -186,15 +258,15 @@
     }
     private async Task SelectCoreAsync(Guid? id)
     {
-        _selected = _documents.FirstOrDefault(x=>x.Id==id); Editing=false; _confirmation=null; _linePage=1; _panelRevision++;
+        ResetValidation(); _selected = _documents.FirstOrDefault(x=>x.Id==id); Editing=false; _confirmation=null; _linePage=1; _panelRevision++;
         if (_selected is null) { _lines=[]; _warehouse=null; _date=null; _notes=null; return; }
         _date=DateOnly.FromDateTime(_selected.TransactionDate.UtcDateTime); _warehouse=_selected.DestinationWarehouseId?.ToString(); _notes=_selected.Notes;
         _lines=(await Inventory.GetInventoryTransactionLinesAsync(_selected.Id)).Select(x=>new OpeningLine{Variant=x.ProductVariantId.ToString(),Quantity=x.Quantity.ToString(CultureInfo.InvariantCulture),Cost=x.UnitCost.ToString(CultureInfo.InvariantCulture),Notes=x.Notes}).ToList();
         if(Index>=0) _historyPage=Index/20+1;
     }
     private Task SelectAsync(Guid id) => Editing ? Task.CompletedTask : RunAsync(()=>SelectCoreAsync(id));
-    private Task NewAsync(MouseEventArgs _) { if (Busy || Editing || !Enabled) return Task.CompletedTask; _selected=null; _warehouse=null; _date=DateOnly.FromDateTime(DateTime.Today); _notes=null; _lines=[new()]; _linePage=1; _panelRevision++; Editing=true; _confirmation=null; return Task.CompletedTask; }
-    private Task EditAsync(MouseEventArgs _) { if(Draft){Editing=true;_panelRevision++;_confirmation=null;} return Task.CompletedTask; }
+    private Task NewAsync(MouseEventArgs _) { if (Busy || Editing || !Enabled) return Task.CompletedTask; ResetValidation(); _selected=null; _warehouse=null; _date=DateOnly.FromDateTime(DateTime.Today); _notes=null; _lines=[new()]; _linePage=1; _panelRevision++; Editing=true; _confirmation=null; return Task.CompletedTask; }
+    private Task EditAsync(MouseEventArgs _) { if(Draft){ResetValidation();Editing=true;_panelRevision++;_confirmation=null;} return Task.CompletedTask; }
     private Task CancelAsync(MouseEventArgs _) => RunAsync(()=>SelectCoreAsync(_selected?.Id ?? _documents.FirstOrDefault()?.Id));
     private Task RefreshAsync(MouseEventArgs _) => RunAsync(async()=>{var id=_selected?.Id; await LoadAsync();await SelectCoreAsync(id ?? _documents.FirstOrDefault()?.Id);});
     private Task AddLineAsync(MouseEventArgs _) { _lines.Add(new()); _linePage=(_lines.Count+19)/20; return Task.CompletedTask; }
@@ -204,10 +276,9 @@
     private Task NavigateAsync(int d) { var f=Filtered;if(f.Count==0)return Task.CompletedTask;var i=d switch{-2=>0,2=>f.Count-1,_=>Math.Clamp(Index+d,0,f.Count-1)};return SelectAsync(f[i].Id); }
     private Task SaveAsync(MouseEventArgs args) => RunAsync(async()=>{
         if(!Editing || !Enabled) return;
-        if(!Guid.TryParse(_warehouse,out var warehouse) || !_date.HasValue || _lines.Count==0 || _lines.Any(l=>!Guid.TryParse(l.Variant,out _) || QuantityError(l)!=null || CostError(l)!=null || LineValue(l)<=0)) { _error="راجع المخزن والتاريخ والأصناف والكميات والتكاليف.";return; }
+        if (!ValidateBeforeSave()) return;
         var entries=_lines.Select(l=>new CreateInventoryTransactionLineRequest(Guid.Parse(l.Variant!),Number(l.Quantity),Number(l.Cost),l.Notes)).ToArray();
-        if(entries.Select(x=>x.ProductVariantId).Distinct().Count()!=entries.Length) { _error="لا يجوز تكرار الصنف في المستند.";return; }
-        var request=new InventoryOpeningRequest(warehouse,_date.Value,_notes,entries);
+        var request=new InventoryOpeningRequest(Guid.Parse(_warehouse!),_date!.Value,_notes,entries);
         var id=_selected is null ? await Api.PostAsync<InventoryOpeningRequest,Guid>(Endpoint,request) : await Api.PutAsync<InventoryOpeningRequest,Guid>($"{Endpoint}/{_selected.Id:D}",request);
         if(id==Guid.Empty) throw new InvalidOperationException("Empty opening id");
         Editing=false; await LoadAsync(); await SelectCoreAsync(id); Snackbar.Success("تم حفظ مسودة الرصيد الافتتاحي.");
