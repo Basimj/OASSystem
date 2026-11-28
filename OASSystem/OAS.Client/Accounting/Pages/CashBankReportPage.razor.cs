@@ -23,6 +23,7 @@ public partial class CashBankReportPage
         public Guid? Currency { get; set; }
         public Guid? DisplayCurrency { get; set; }
         public string Activity { get; set; } = "all";
+        public string MovementType { get; set; } = "";
         public string ShiftState { get; set; } = "all";
         public string Settlement { get; set; } = "all";
         public bool IncludeZero { get; set; }
@@ -52,10 +53,12 @@ public partial class CashBankReportPage
     private string[] Headers => _report?.Headers.ToArray() ?? ["الحساب", "البيان"];
     private string EffectiveKind => _draft.Mode is "cash" or "shifts" or "differences" ? "cash" : _draft.Mode == "bank" ? "bank" : _draft.Kind;
     private IReadOnlyList<UiSelectOption> AccountOptions => new[] { new UiSelectOption("", "الكل") }.Concat(_accounts.Where(a => (EffectiveKind == "all" || a.Kind == EffectiveKind)
+        && (EffectiveKind == "bank" || string.IsNullOrEmpty(_draft.MovementType) || a.MovementType?.ToString() == _draft.MovementType)
         && (!_draft.Currency.HasValue || a.CurrencyId == _draft.Currency) && (_draft.Activity == "all" || a.IsActive == (_draft.Activity == "active")))
         .Select(a => new UiSelectOption(a.AccountId.ToString(), $"{a.Code} - {a.Name} ({Currencies.FirstOrDefault(c=>c.Id==a.CurrencyId)?.Code??"غير محددة"})"))).ToArray();
     private string[] Chips => [$"نوع التقرير: {Modes[_applied.Mode]}", $"من: {_applied.From:dd/MM/yyyy}", $"إلى: {_applied.To:dd/MM/yyyy}",
         $"الحساب: {_accounts.FirstOrDefault(a=>a.AccountId.ToString()==_applied.Account)?.Name??"الكل"}", $"نوع الحساب: {(_applied.Kind=="cash"?"صناديق":_applied.Kind=="bank"?"بنوك":"الكل")}",
+        $"نوع حركة الصندوق: {(_applied.MovementType switch { "1"=>"وارد فقط", "2"=>"صادر فقط", "3"=>"وارد وصادر", _=>"الكل" })}",
         $"عملة الحساب: {Currencies.FirstOrDefault(c=>c.Id==_applied.Currency)?.Code??"الكل"}", $"حالة الحساب: {(_applied.Activity=="active"?"نشط":_applied.Activity=="inactive"?"غير نشط":"الكل")}",
         _applied.Mode is "shifts" or "differences" ? $"حالة الوردية: {ShiftLabel(_applied.ShiftState)} | التسوية: {SettlementLabel(_applied.Settlement)} | المستخدم: {Operators.FirstOrDefault(o=>o.Id.ToString()==_applied.Operator)?.Name??"الكل"}" : $"عرض الدفتري: {_displayCode}"];
     private static string ShiftLabel(string s) => s switch { "open"=>"مفتوحة", "closing"=>"قيد الإغلاق", "closed"=>"مغلقة", "approved"=>"معتمدة", _=>"الكل" };
@@ -64,7 +67,8 @@ public partial class CashBankReportPage
     private void ClearAccount() { if(!AccountOptions.Any(x=>x.Value==_draft.Account)) _draft.Account=""; }
     private void OnAccount(string? value) => _draft.Account = value ?? "";
     private void OnOperator(string? value) => _draft.Operator = value ?? "";
-    private void ModeChanged() { _draft.Operator = ""; _draft.Kind = "all"; ClearAccount(); _draft.ShiftState = "all"; _draft.Settlement = "all"; }
+    private void KindChanged() { if (EffectiveKind == "bank") _draft.MovementType = ""; ClearAccount(); }
+    private void ModeChanged() { _draft.MovementType = ""; _draft.Operator = ""; _draft.Kind = "all"; ClearAccount(); _draft.ShiftState = "all"; _draft.Settlement = "all"; }
     private async Task ResetAsync() { if(_busy)return; _draft=new(); _search=""; await ApplyAsync(); }
     private async Task ApplyAsync()
     {
@@ -75,6 +79,7 @@ public partial class CashBankReportPage
         try
         {
             var query=$"api/accounting/reports/cash-bank?fromDate={f.From:yyyy-MM-dd}&toDate={f.To:yyyy-MM-dd}&mode={f.Mode}&kind={f.Kind}&activity={f.Activity}&includeZero={f.IncludeZero.ToString().ToLowerInvariant()}&shiftState={f.ShiftState}&settlementState={f.Settlement}";
+            if (f.Kind != "bank" && byte.TryParse(f.MovementType, out var movementType)) query += $"&movementType={movementType}";
             if(Guid.TryParse(f.Account,out var id))query+=$"&accountId={id:D}";
             if(Guid.TryParse(f.Operator,out var actor))query+=$"&openedBy={actor:D}";
             if(f.Currency is Guid currency)query+=$"&currencyId={currency:D}";

@@ -46,13 +46,14 @@ public sealed class CashBankReportQueryService(OasDbContext db) : ICashBankRepor
             ?? throw new ConflictException("base_currency_missing", "العملة الأساسية غير محددة.");
         var cash = await db.Set<CashAccount>().AsNoTracking().ToListAsync(ct);
         var banks = await db.Set<BankAccount>().AsNoTracking().ToListAsync(ct);
-        var definitions = cash.Select(x => new CashBankReportAccountDto(x.AccountId, x.Code, x.Name, "cash", x.CurrencyId, x.IsActive))
+        var definitions = cash.Select(x => new CashBankReportAccountDto(x.AccountId, x.Code, x.Name, "cash", x.CurrencyId, x.IsActive, (byte)x.MovementType))
             .Concat(banks.Select(x => new CashBankReportAccountDto(x.AccountId, x.Code, x.BankName + " - " + x.AccountName, "bank", x.CurrencyId, x.IsActive))).ToArray();
         var warnings = new List<string>();
         var groups = definitions.GroupBy(x => x.AccountId).ToArray();
         if (groups.Any(g => g.Count() != 1)) warnings.Add("استُبعدت الحسابات المحاسبية المشتركة من الأرصدة لتجنب تكرارها. التقرير غير شامل حتى تصحيح الربط.");
         var accounts = groups.Where(g => g.Count() == 1).Select(g => g.Single()).OrderBy(x => x.Kind).ThenBy(x => x.Name).ToArray();
         var selected = accounts.Where(x => (f.Kind == "all" || x.Kind == f.Kind) && (!f.AccountId.HasValue || x.AccountId == f.AccountId)
+            && (f.Mode == "bank" || f.Kind == "bank" || !f.MovementType.HasValue || x.MovementType == f.MovementType)
             && (!f.CurrencyId.HasValue || x.CurrencyId == f.CurrencyId) && (f.Activity == "all" || x.IsActive == (f.Activity == "active"))
             && (f.Mode is not ("cash" or "shifts" or "differences") || x.Kind == "cash") && (f.Mode != "bank" || x.Kind == "bank")).ToArray();
         var ids = selected.Select(x => x.AccountId).ToArray();
@@ -65,7 +66,7 @@ public sealed class CashBankReportQueryService(OasDbContext db) : ICashBankRepor
         if (f.Mode == "transfers")
         {
             // Period membership is taken from posted journals, not the current document status.
-            var allTransferAccounts = f.Kind == "all" && !f.AccountId.HasValue && !f.CurrencyId.HasValue && f.Activity == "all";
+            var allTransferAccounts = f.Kind == "all" && !f.AccountId.HasValue && !f.CurrencyId.HasValue && f.Activity == "all" && !f.MovementType.HasValue;
             var transfers = await db.Set<CashTransfer>().AsNoTracking().Where(x => (allTransferAccounts || ids.Contains(x.SourceAccountId) || ids.Contains(x.DestinationAccountId))
                 && ((x.TransferDate >= f.FromDate && x.TransferDate <= f.ToDate) || (x.ReversalDate >= f.FromDate && x.ReversalDate <= f.ToDate)))
                 .Take(MaxRows + 1).ToListAsync(ct);

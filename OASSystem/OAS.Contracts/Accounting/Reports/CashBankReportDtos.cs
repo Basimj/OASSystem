@@ -2,8 +2,8 @@ namespace OAS.Contracts.Accounting.Reports;
 
 public sealed record CashBankReportFilterDto(DateOnly FromDate, DateOnly ToDate, string Mode = "balances",
     string Kind = "all", Guid? AccountId = null, Guid? CurrencyId = null, string Activity = "all",
-    bool IncludeZero = false, string ShiftState = "all", string SettlementState = "all", Guid? OpenedBy = null);
-public sealed record CashBankReportAccountDto(Guid AccountId, string Code, string Name, string Kind, Guid? CurrencyId, bool IsActive);
+    bool IncludeZero = false, string ShiftState = "all", string SettlementState = "all", Guid? OpenedBy = null, byte? MovementType = null);
+public sealed record CashBankReportAccountDto(Guid AccountId, string Code, string Name, string Kind, Guid? CurrencyId, bool IsActive, byte? MovementType = null);
 public sealed record CashBankReportOperatorDto(Guid Id, string Name);
 public sealed record CashBankReportCurrencyDto(Guid Id, string Code, string Name, byte DecimalPlaces);
 // Amounts are numeric, never formatted on the server. Only Base cells may be converted for display.

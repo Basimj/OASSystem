@@ -1,4 +1,5 @@
 using OAS.Domain.Common.Entities;
+using OAS.Domain.Accounting.Enums;
 
 namespace OAS.Domain.Accounting.Entities;
 
@@ -33,6 +34,17 @@ public sealed class CashAccount : AuditableEntity<Guid>
     public Guid AccountId { get; private set; }
 
     public Guid? CurrencyId { get; private set; }
+
+    public CashAccountMovementType MovementType { get; private set; } = CashAccountMovementType.ReceiptAndPayment;
+
+    public bool AllowsReceipt => MovementType is CashAccountMovementType.ReceiptOnly or CashAccountMovementType.ReceiptAndPayment;
+    public bool AllowsPayment => MovementType is CashAccountMovementType.PaymentOnly or CashAccountMovementType.ReceiptAndPayment;
+
+    public void SetMovementType(CashAccountMovementType value)
+    {
+        if (!Enum.IsDefined(value)) throw new ArgumentOutOfRangeException(nameof(value));
+        MovementType = value;
+    }
 
     public bool RequiresOpenShift { get; private set; }
 

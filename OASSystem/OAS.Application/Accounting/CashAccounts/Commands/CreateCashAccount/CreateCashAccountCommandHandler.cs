@@ -64,6 +64,7 @@ public sealed class CreateCashAccountCommandHandler(
             data.IsActive);
 
         entity.SetRequiresOpenShift(data.RequiresOpenShift);
+        entity.SetMovementType((OAS.Domain.Accounting.Enums.CashAccountMovementType)(byte)data.MovementType);
         await repository.AddAsync(entity, cancellationToken);
         return entity;
     }

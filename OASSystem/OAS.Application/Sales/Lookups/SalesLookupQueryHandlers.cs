@@ -493,9 +493,9 @@ public sealed class SearchSalesCashAccountsQueryHandler(
         var search = request.Search?.Trim();
         var spec = new Specification<CashAccount>();
         if (!string.IsNullOrWhiteSpace(search))
-            spec.Where(x => x.IsActive && x.CurrencyId == request.CurrencyId && (x.Code.Contains(search) || x.Name.Contains(search)));
+            spec.Where(x => x.IsActive && x.MovementType != OAS.Domain.Accounting.Enums.CashAccountMovementType.PaymentOnly && x.CurrencyId == request.CurrencyId && (x.Code.Contains(search) || x.Name.Contains(search)));
         else
-            spec.Where(x => x.IsActive && x.CurrencyId == request.CurrencyId);
+            spec.Where(x => x.IsActive && x.MovementType != OAS.Domain.Accounting.Enums.CashAccountMovementType.PaymentOnly && x.CurrencyId == request.CurrencyId);
 
         spec.AddSort(nameof(CashAccount.IsDefault), OAS.Contracts.Common.Pagination.SortDirection.Descending)
             .AddSort(nameof(CashAccount.Name), OAS.Contracts.Common.Pagination.SortDirection.Ascending)

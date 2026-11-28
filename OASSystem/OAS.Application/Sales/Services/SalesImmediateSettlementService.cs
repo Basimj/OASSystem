@@ -59,7 +59,7 @@ public sealed class SalesImmediateSettlementService(
             bankAccountId,
             null,
             invoice.InvoiceCode,
-            ct);
+            ct, isReceipt: true);
 
         var voucherNumber = await ReserveVoucherNumberAsync(invoice.PostingDate.Year, ct);
         var voucherId = Guid.NewGuid();

@@ -1007,6 +1007,11 @@ namespace OAS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<byte>("MovementType")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint")
+                        .HasDefaultValue((byte)3);
+
                     b.Property<bool>("RequiresOpenShift")
                         .HasColumnType("bit");
 
@@ -1036,7 +1041,10 @@ namespace OAS.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("UX_CashAccounts_DefaultPerCurrency")
                         .HasFilter("[IsDefault] = 1 AND [IsActive] = 1 AND [CurrencyId] IS NOT NULL");
 
-                    b.ToTable("tbl_CashAccounts", "dbo");
+                    b.ToTable("tbl_CashAccounts", "dbo", t =>
+                    {
+                        t.HasCheckConstraint("CK_CashAccounts_MovementType", "[MovementType] IN (1, 2, 3)");
+                    });
                 });
 
             modelBuilder.Entity("OAS.Domain.Accounting.Entities.CashShift", b =>

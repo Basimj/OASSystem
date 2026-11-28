@@ -110,7 +110,7 @@ public sealed class PayPurchaseInvoiceCommandHandler(
             null,
             ExchangeRateType.Accounting,
             request.ReferenceNumber,
-            ct);
+            ct, isReceipt: false);
 
         var targetValidator = targetValidators.SingleOrDefault(x => x.TargetDocumentType == AllocationTargetDocumentType.PurchaseInvoice)
             ?? throw new ConflictException("purchase_invoice_payment_validator_missing", "إعدادات التحقق من سداد فواتير الموردين غير متاحة.");

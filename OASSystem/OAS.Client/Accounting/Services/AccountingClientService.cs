@@ -56,6 +56,8 @@ public sealed class AccountingClientService(
             query += $"&status={Uri.EscapeDataString(normalized.Status)}";
         }
 
+        if (normalized.CashCurrencyId.HasValue) query += $"&cashCurrencyId={normalized.CashCurrencyId.Value:D}";
+        if (normalized.CashReceipt.HasValue) query += $"&cashReceipt={normalized.CashReceipt.Value.ToString().ToLowerInvariant()}";
         if (normalized.DateFrom.HasValue)
             query += $"&dateFrom={normalized.DateFrom.Value:yyyy-MM-dd}";
         if (normalized.DateTo.HasValue)

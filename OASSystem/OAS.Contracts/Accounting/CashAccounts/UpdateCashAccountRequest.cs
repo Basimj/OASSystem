@@ -6,4 +6,5 @@ public sealed record UpdateCashAccountRequest(
     bool IsDefault,
     bool IsActive,
     string RowVersion,
-    bool? RequiresOpenShift = null);
+    bool? RequiresOpenShift = null,
+    CashAccountMovementType? MovementType = null);

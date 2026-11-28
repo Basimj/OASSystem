@@ -17,7 +17,7 @@ public sealed class VoucherSettlementResolver(
     IReadRepository<AccountingSettings, Guid> settingsRepository,
     IReadRepository<Currency, Guid> currencies) : IVoucherSettlementResolver
 {
-    public async Task<VoucherSettlementResolution> ResolveAsync(
+    public Task<VoucherSettlementResolution> ResolveAsync(
         DateOnly voucherDate,
         SettlementPartyType partyType,
         Guid? customerId,
@@ -34,11 +34,53 @@ public sealed class VoucherSettlementResolver(
         decimal? manualExchangeRate,
         ExchangeRateType exchangeRateType,
         string? referenceNumber,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        ResolveCoreAsync(voucherDate, partyType, customerId, supplierId, employeeId, partyName, otherCounterpartyAccountId, paymentMethod, cashAccountId, bankAccountId, otherSettlementAccountId, currencyId, amount, manualExchangeRate, exchangeRateType, referenceNumber, cancellationToken, null);
+
+    public Task<VoucherSettlementResolution> ResolveAsync(
+        DateOnly voucherDate,
+        SettlementPartyType partyType,
+        Guid? customerId,
+        Guid? supplierId,
+        Guid? employeeId,
+        string? partyName,
+        Guid? otherCounterpartyAccountId,
+        PaymentMethod paymentMethod,
+        Guid? cashAccountId,
+        Guid? bankAccountId,
+        Guid? otherSettlementAccountId,
+        Guid currencyId,
+        decimal amount,
+        decimal? manualExchangeRate,
+        ExchangeRateType exchangeRateType,
+        string? referenceNumber,
+        CancellationToken cancellationToken, bool isReceipt) =>
+        ResolveCoreAsync(voucherDate, partyType, customerId, supplierId, employeeId, partyName, otherCounterpartyAccountId, paymentMethod, cashAccountId, bankAccountId, otherSettlementAccountId, currencyId, amount, manualExchangeRate, exchangeRateType, referenceNumber, cancellationToken, isReceipt);
+
+    private async Task<VoucherSettlementResolution> ResolveCoreAsync(
+        DateOnly voucherDate,
+        SettlementPartyType partyType,
+        Guid? customerId,
+        Guid? supplierId,
+        Guid? employeeId,
+        string? partyName,
+        Guid? otherCounterpartyAccountId,
+        PaymentMethod paymentMethod,
+        Guid? cashAccountId,
+        Guid? bankAccountId,
+        Guid? otherSettlementAccountId,
+        Guid currencyId,
+        decimal amount,
+        decimal? manualExchangeRate,
+        ExchangeRateType exchangeRateType,
+        string? referenceNumber,
+        CancellationToken cancellationToken, bool? isReceipt)
     {
         if (amount <= 0 || amount >= 1000000000000000m) throw new ConflictException("settlement_amount_invalid", "أدخل مبلغ تسوية أكبر من صفر وضمن الحدود المحاسبية.");
         var party = await counterparties.ResolveAsync(partyType, customerId, supplierId, employeeId, partyName, otherCounterpartyAccountId, cancellationToken);
-        var settlement = await settlements.ResolveAsync(paymentMethod, currencyId, cashAccountId, bankAccountId, otherSettlementAccountId, referenceNumber, cancellationToken);
+        var settlement = isReceipt.HasValue
+            ? await settlements.ResolveAsync(paymentMethod, currencyId, cashAccountId, bankAccountId, otherSettlementAccountId, referenceNumber, cancellationToken, isReceipt.Value)
+            : await settlements.ResolveAsync(paymentMethod, currencyId, cashAccountId, bankAccountId, otherSettlementAccountId, referenceNumber, cancellationToken);
         if (party.AccountId == settlement.AccountId)
             throw new ConflictException("voucher_same_accounts", "لا يجوز أن يكون حساب الطرف هو حساب التسوية نفسه.");
         var allowManual = manualExchangeRate.HasValue && await permissions.HasPermissionAsync(AccountingPermissions.ExchangeRates.Override, cancellationToken);

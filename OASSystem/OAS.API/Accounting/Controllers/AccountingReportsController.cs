@@ -28,9 +28,9 @@ public sealed class AccountingReportsController(ISender sender) : ControllerBase
     public async Task<ActionResult<CashBankReportDto>> CashBank([FromQuery] DateOnly fromDate, [FromQuery] DateOnly toDate,
         [FromQuery] string mode = "balances", [FromQuery] string kind = "all", [FromQuery] Guid? accountId = null,
         [FromQuery] Guid? currencyId = null, [FromQuery] string activity = "all", [FromQuery] bool includeZero = false,
-        [FromQuery] string shiftState = "all", [FromQuery] string settlementState = "all", [FromQuery] Guid? openedBy = null, CancellationToken ct = default)
+        [FromQuery] string shiftState = "all", [FromQuery] string settlementState = "all", [FromQuery] Guid? openedBy = null, CancellationToken ct = default, [FromQuery] byte? movementType = null)
         => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetCashBankReport.GetCashBankReportQuery(
-            new CashBankReportFilterDto(fromDate, toDate, mode, kind, accountId, currencyId, activity, includeZero, shiftState, settlementState, openedBy)), ct));
+            new CashBankReportFilterDto(fromDate, toDate, mode, kind, accountId, currencyId, activity, includeZero, shiftState, settlementState, openedBy, movementType)), ct));
 
     [HttpGet("balance-sheet")]
     public async Task<ActionResult<BalanceSheetReportDto>> BalanceSheet([FromQuery] DateOnly asOfDate,

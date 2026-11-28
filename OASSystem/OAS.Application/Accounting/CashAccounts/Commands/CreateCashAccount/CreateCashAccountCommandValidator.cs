@@ -12,6 +12,8 @@ public sealed class CreateCashAccountCommandValidator
             .WithErrorCode("cash_account_code_max_length")
             .When(x => !string.IsNullOrWhiteSpace(x.Data.Code));
 
+        RuleFor(x => x.Data.MovementType).IsInEnum().WithMessage("نوع حركة الصندوق غير صالح.");
+
         RuleFor(x => x.Data.Name)
             .NotEmpty()
             .WithErrorCode("cash_account_name_required")

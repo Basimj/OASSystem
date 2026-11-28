@@ -13,11 +13,12 @@ public sealed class CashAccountMapper : ICrudMapper<CashAccount, Guid, CashAccou
     {
         destination.UpdateDetails(destination.Code, source.Name, destination.AccountId, source.CurrencyId, source.IsDefault);
         destination.SetActive(source.IsActive);
+        if (source.MovementType is { } movement) destination.SetMovementType((OAS.Domain.Accounting.Enums.CashAccountMovementType)(byte)movement);
         if (source.RequiresOpenShift is bool required) destination.SetRequiresOpenShift(required);
     }
 
     public CashAccountDto ToRead(CashAccount source) => new(
         source.Id, source.Code, source.Name, source.AccountId, source.CurrencyId,
         source.IsDefault, source.IsActive,
-        source.RowVersion is not null ? Convert.ToBase64String(source.RowVersion) : string.Empty, source.RequiresOpenShift);
+        source.RowVersion is not null ? Convert.ToBase64String(source.RowVersion) : string.Empty, source.RequiresOpenShift, (CashAccountMovementType)(byte)source.MovementType);
 }

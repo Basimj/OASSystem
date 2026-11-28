@@ -10,6 +10,8 @@ public sealed record PageRequest
     public string? Search { get; init; }
     // Optional server-side status filter used by multiple accounting list endpoints.
     public string? Status { get; init; }
+    public Guid? CashCurrencyId { get; init; }
+    public bool? CashReceipt { get; init; }
     // Expense-specific filters. Other page specifications intentionally ignore these.
     public DateOnly? DateFrom { get; init; }
     public DateOnly? DateTo { get; init; }

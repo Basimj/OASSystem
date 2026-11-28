@@ -23,10 +23,14 @@
             </div>
             @if (_draft.Mode is "balances" or "currency" or "transfers")
             {
-                <label class="oas-report__field">نوع الحساب<select @bind="_draft.Kind" @bind:after="ClearAccount"><option value="all">الكل</option><option value="cash">صناديق</option><option value="bank">بنوك</option></select></label>
+                <label class="oas-report__field">نوع الحساب<select @bind="_draft.Kind" @bind:after="KindChanged"><option value="all">الكل</option><option value="cash">صناديق</option><option value="bank">بنوك</option></select></label>
             }
             <div class="oas-report__field"><UiReportSearchPicker Label="الصندوق / البنك" DialogTitle="اختيار الحساب النقدي" Value="@_draft.Account" ValueChanged="OnAccount" Options="@AccountOptions" Placeholder="الكل" /></div>
             <label class="oas-report__field">عملة الحساب<select @bind="_draft.Currency" @bind:after="ClearAccount"><option value="">جميع العملات</option>@foreach(var c in Currencies){<option value="@c.Id">@c.Name (@c.Code)</option>}</select></label>
+            @if (EffectiveKind != "bank")
+            {
+                <label class="oas-report__field">نوع حركة الصندوق<select @bind="_draft.MovementType" @bind:after="ClearAccount"><option value="">الكل</option><option value="1">وارد فقط</option><option value="2">صادر فقط</option><option value="3">وارد وصادر</option></select></label>
+            }
             <label class="oas-report__field">حالة الحساب<select @bind="_draft.Activity" @bind:after="ClearAccount"><option value="all">الكل</option><option value="active">نشط</option><option value="inactive">غير نشط</option></select></label>
             @if (_draft.Mode is "shifts" or "differences")
             {

@@ -91,9 +91,9 @@ public partial class PurchasingWorkspaceHost
 
     private async Task<IReadOnlyList<UiLookupItem>> SearchInvoiceCashAccountsAsync(Guid currencyId,string search,CancellationToken ct)
     {
-        var page=await Accounting.GetCashAccountsPageAsync(LookupRequest(search),ct);
+        var page=await Accounting.GetCashAccountsPageAsync(LookupRequest(search) with { Status = "active", CashCurrencyId = currencyId, CashReceipt = false },ct);
         return page.Items
-            .Where(x=>x.IsActive&&x.CurrencyId==currencyId)
+            .Where(x=>x.IsActive&&x.MovementType!=OAS.Contracts.Accounting.CashAccounts.CashAccountMovementType.ReceiptOnly&&x.CurrencyId==currencyId)
             .Take(12)
             .Select(x=>new UiLookupItem(x.Id.ToString("D"),x.Name,x.Code,"fa-solid fa-cash-register"))
             .ToArray();
